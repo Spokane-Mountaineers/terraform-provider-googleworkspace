@@ -1,0 +1,27 @@
+# Compiled provider binary
+terraform-provider-google-workspace
+dist/
+bin/
+
+# Go test / coverage artifacts
+*.test
+*.out
+coverage.*
+
+# Terraform / OpenTofu
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Local CLI overrides
+.terraformrc
+terraform.rc
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
