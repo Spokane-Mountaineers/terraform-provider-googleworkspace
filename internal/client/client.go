@@ -17,16 +17,17 @@ import (
 const DefaultCustomerID = "my_customer"
 
 // DefaultScopes are the OAuth scopes requested when minting a domain-wide
-// delegation token. They must be authorized for the service account under
+// delegation token. They are read-write so the provider can manage directory
+// resources, and must be authorized for the service account under
 // Admin console → Security → API controls → Domain-wide delegation.
 var DefaultScopes = []string{
-	admin.AdminDirectoryUserReadonlyScope,
-	admin.AdminDirectoryGroupReadonlyScope,
-	admin.AdminDirectoryGroupMemberReadonlyScope,
-	admin.AdminDirectoryOrgunitReadonlyScope,
-	admin.AdminDirectoryRolemanagementReadonlyScope,
-	admin.AdminDirectoryDomainReadonlyScope,
-	admin.AdminDirectoryUserschemaReadonlyScope,
+	admin.AdminDirectoryUserScope,
+	admin.AdminDirectoryGroupScope,
+	admin.AdminDirectoryGroupMemberScope,
+	admin.AdminDirectoryOrgunitScope,
+	admin.AdminDirectoryRolemanagementScope,
+	admin.AdminDirectoryDomainScope,
+	admin.AdminDirectoryUserschemaScope,
 }
 
 // Config holds the resolved provider configuration.

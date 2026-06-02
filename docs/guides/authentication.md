@@ -23,7 +23,7 @@ they must hold `roles/iam.serviceAccountTokenCreator` on the service account.
 
 ```shell
 gcloud services enable admin.googleapis.com groupssettings.googleapis.com \
-  --project=YOUR_PROJECT
+  cloudidentity.googleapis.com --project=YOUR_PROJECT
 ```
 
 ### 2. Create the service account
@@ -48,20 +48,22 @@ gcloud iam service-accounts describe \
 
 As a super admin: **Admin console → Security → Access and data control → API controls
 → Domain-wide delegation → Add new**. Enter the numeric client ID from step 3 and the
-OAuth scopes the provider requests:
+provider's read-write OAuth scopes:
 
 ```text
-https://www.googleapis.com/auth/admin.directory.user.readonly,
-https://www.googleapis.com/auth/admin.directory.group.readonly,
-https://www.googleapis.com/auth/admin.directory.group.member.readonly,
-https://www.googleapis.com/auth/admin.directory.orgunit.readonly,
-https://www.googleapis.com/auth/admin.directory.rolemanagement.readonly,
-https://www.googleapis.com/auth/admin.directory.domain.readonly,
-https://www.googleapis.com/auth/admin.directory.userschema.readonly,
+https://www.googleapis.com/auth/admin.directory.user,
+https://www.googleapis.com/auth/admin.directory.group,
+https://www.googleapis.com/auth/admin.directory.group.member,
+https://www.googleapis.com/auth/admin.directory.orgunit,
+https://www.googleapis.com/auth/admin.directory.rolemanagement,
+https://www.googleapis.com/auth/admin.directory.domain,
+https://www.googleapis.com/auth/admin.directory.userschema,
 https://www.googleapis.com/auth/apps.groups.settings
 ```
 
-Drop the `.readonly` suffixes when you start managing (writing) those resources.
+These are read-write so the provider can both read (plan, import, refresh) and manage
+(apply) directory resources. The scope set must exactly cover what the provider
+requests — a missing scope yields `unauthorized_client` when minting the token.
 
 ### 5. Grant the caller permission to mint tokens (keyless)
 
@@ -92,10 +94,10 @@ resources you manage.
 
 ## Troubleshooting
 
-- **`unauthorized_client`** when minting a token — the service account's client ID is
-  not authorized in the Admin console for the requested scopes, or the change has not
-  propagated yet (usually minutes, up to 24h).
-- **`403` on a read or write** — the impersonated user lacks the admin privilege for
+- **`unauthorized_client`** when minting a token — the requested scopes are not all
+  authorized for the service account's client ID in the Admin console (or the change
+  has not propagated yet, usually minutes, up to 24h).
+- **`403`** on a read or write — the impersonated user lacks the admin privilege for
   that resource. Use a user with the right admin role.
-- **`PermissionDenied` minting the token** — the caller is missing
+- **`PermissionDenied`** minting the token — the caller is missing
   `roles/iam.serviceAccountTokenCreator` on the service account.
