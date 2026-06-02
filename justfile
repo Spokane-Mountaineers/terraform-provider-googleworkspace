@@ -18,52 +18,64 @@ default:
     @just --list
 
 # Format code (go fmt + gofmt -s).
+[group: 'dev']
 fmt:
     go fmt ./...
     gofmt -s -w .
 
 # Verify formatting; fail if anything is unformatted.
+[group: 'quality']
 fmt-check:
     @test -z "$(gofmt -s -l .)" || { echo "unformatted files:"; gofmt -s -l .; exit 1; }
 
 # Apply automated fixes for deprecated API usage.
+[group: 'dev']
 fix:
     go fix ./...
 
 # Tidy module dependencies.
+[group: 'dev']
 tidy:
     go mod tidy
 
 # Run go vet.
+[group: 'quality']
 vet:
     go vet ./...
 
 # Run the linter.
+[group: 'quality']
 lint:
     golangci-lint run
 
 # Run the linter and apply autofixes.
+[group: 'quality']
 lint-fix:
     golangci-lint run --fix
 
 # Run unit tests.
+[group: 'testing']
 test:
     go test ./...
 
 # Run tests with coverage.
+[group: 'testing']
 test-cover:
     go test -coverprofile=coverage.out ./...
     go tool cover -func=coverage.out | tail -1
 
 # Run acceptance tests (hits the live Workspace API; requires credentials).
+[group: 'testing']
 testacc:
     TF_ACC=1 go test ./... -v -timeout 30m
 
 # Build the provider binary.
+[group: 'build']
 build:
     go build -ldflags "-X main.version={{ version }}" -o {{ binary }} .
 
 # Build and install into the local ~/.terraform.d/plugins filesystem mirror.
+[group: 'build']
 install: build
     #!/usr/bin/env bash
     set -euo pipefail
@@ -74,6 +86,7 @@ install: build
     echo "installed to ${dest}"
 
 # Generate registry documentation (docs/) from schema, templates, and examples.
+[group: 'docs']
 docs:
     go tool tfplugindocs generate \
         --provider-name {{ provider_name }} \
@@ -81,12 +94,15 @@ docs:
         --tf-version {{ tf_version }}
 
 # Verify generated docs are current; fails if `just docs` would change anything.
+[group: 'docs']
 docs-check: docs
     @git diff --exit-code -- docs/ || { echo "docs out of date: run 'just docs' and commit"; exit 1; }
 
 # Full local check: format, vet, lint, test.
+[group: 'quality']
 ci: fmt-check vet lint test
 
 # Remove build artifacts.
+[group: 'build']
 clean:
     rm -f {{ binary }} coverage.out
