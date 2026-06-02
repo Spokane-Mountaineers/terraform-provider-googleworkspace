@@ -17,9 +17,7 @@ for Workspace: HashiCorp's `googleworkspace` was a tech preview, last released v
 in June 2022, and was archived in 2025. This is a thin, purpose-built provider on the
 [Terraform Plugin Framework][framework], scoped to what we actually manage.
 
-~> **Resource naming.** The repository is `terraform-provider-google-workspace`, but
-Terraform resource type prefixes cannot contain hyphens, so resources are named
-`googleworkspace_*` (for example `googleworkspace_user`).
+Resources are named `googleworkspace_*` (for example `googleworkspace_user`).
 
 ## Example Usage
 

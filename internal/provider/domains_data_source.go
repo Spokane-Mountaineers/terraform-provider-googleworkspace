@@ -8,7 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/Spokane-Mountaineers/terraform-provider-google-workspace/internal/client"
+	"github.com/Spokane-Mountaineers/terraform-provider-googleworkspace/internal/client"
 )
 
 var (

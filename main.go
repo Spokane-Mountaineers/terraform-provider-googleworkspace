@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"github.com/Spokane-Mountaineers/terraform-provider-google-workspace/internal/provider"
+	"github.com/Spokane-Mountaineers/terraform-provider-googleworkspace/internal/provider"
 )
 
 // version is set via -ldflags at release time; "dev" otherwise.
@@ -19,9 +19,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		// The repo is terraform-provider-google-workspace, but the resource type
-		// prefix cannot contain hyphens, so resources are googleworkspace_*.
-		Address: "registry.spokanemountaineers.org/spokane-mountaineers/google-workspace",
+		Address: "registry.opentofu.org/spokane-mountaineers/googleworkspace",
 		Debug:   debug,
 	}
 

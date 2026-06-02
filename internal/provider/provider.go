@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/Spokane-Mountaineers/terraform-provider-google-workspace/internal/client"
+	"github.com/Spokane-Mountaineers/terraform-provider-googleworkspace/internal/client"
 )
 
 // Ensure the provider satisfies the framework interface.

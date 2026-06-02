@@ -3,10 +3,10 @@
 
 set shell := ["bash", "-uc"]
 
-binary := "terraform-provider-google-workspace"
-mirror_host := "registry.spokanemountaineers.org"
+binary := "terraform-provider-googleworkspace"
+mirror_host := "registry.opentofu.org"
 mirror_ns := "spokane-mountaineers"
-mirror_type := "google-workspace"
+mirror_type := "googleworkspace"
 version := "0.0.0-dev"
 # Resource type prefix (hyphen-free); also the tfplugindocs provider name.
 provider_name := "googleworkspace"

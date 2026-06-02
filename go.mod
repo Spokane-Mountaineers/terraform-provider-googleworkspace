@@ -1,4 +1,4 @@
-module github.com/Spokane-Mountaineers/terraform-provider-google-workspace
+module github.com/Spokane-Mountaineers/terraform-provider-googleworkspace
 
 go 1.26.3
 

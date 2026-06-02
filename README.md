@@ -1,4 +1,4 @@
-# terraform-provider-google-workspace
+# terraform-provider-googleworkspace
 
 An OpenTofu/Terraform provider for managing Google Workspace directory resources,
 built on Google's supported APIs — the [Admin SDK Directory API][admin-sdk] and the
@@ -8,18 +8,13 @@ It exists because there is no actively-maintained, comprehensive provider for
 Workspace: HashiCorp's `googleworkspace` was a tech preview, last released v0.7.0
 (June 2022), and was archived in 2025. This is a thin, purpose-built provider on
 [`terraform-plugin-framework`][framework], scoped to what the Spokane Mountaineers
-org actually manages.
+org actually manages. Resources are named `googleworkspace_*` (for example
+`googleworkspace_user`). The provider source address is
+`registry.opentofu.org/spokane-mountaineers/googleworkspace`.
 
 > **Status:** early. Today it ships the provider skeleton and a `googleworkspace_domains`
 > data source that proves auth and connectivity end-to-end. Resources (users, groups,
 > org units, roles) land iteratively.
-
-## Naming
-
-The repository is `terraform-provider-google-workspace`, but Terraform resource type
-prefixes cannot contain hyphens, so resources are named **`googleworkspace_*`** (for
-example `googleworkspace_user`). The provider source address is
-`registry.spokanemountaineers.org/spokane-mountaineers/google-workspace`.
 
 ## Authentication
 
@@ -46,6 +41,12 @@ Credential precedence:
 
 `customer_id` defaults to `my_customer` and may be set via the provider attribute or
 `GOOGLEWORKSPACE_CUSTOMER_ID`.
+
+> **"This app is blocked".** Workspace's API access controls can block the OAuth
+> client used by the login above from sensitive Admin SDK scopes. An admin must mark
+> the client **Trusted** under Admin console → Security → Access and data control →
+> API controls → App access control, or use a dedicated OAuth client / a service
+> account with domain-wide delegation. See [docs/index.md](./docs/index.md).
 
 ```hcl
 provider "googleworkspace" {
@@ -83,8 +84,6 @@ schema, the `templates/` (rich Overview in `templates/index.md.tmpl`), and the
 `examples/` `.tf` files. Edit those sources — not `docs/` — and run `just docs`. CI
 fails if the committed `docs/` are stale.
 
-[tfplugindocs]: https://github.com/hashicorp/terraform-plugin-docs
-
 To use a local build, point your CLI config at the filesystem mirror after
 `just install`, e.g. in `~/.terraformrc`:
 
@@ -92,10 +91,10 @@ To use a local build, point your CLI config at the filesystem mirror after
 provider_installation {
   filesystem_mirror {
     path    = "/Users/<you>/.terraform.d/plugins"
-    include = ["registry.spokanemountaineers.org/*/*"]
+    include = ["registry.opentofu.org/spokane-mountaineers/*"]
   }
   direct {
-    exclude = ["registry.spokanemountaineers.org/*/*"]
+    exclude = ["registry.opentofu.org/spokane-mountaineers/*"]
   }
 }
 ```
@@ -107,3 +106,4 @@ Apache License 2.0 — see [LICENSE](./LICENSE).
 [admin-sdk]: https://developers.google.com/admin-sdk/directory
 [cloud-identity]: https://cloud.google.com/identity/docs/reference/rest
 [framework]: https://github.com/hashicorp/terraform-plugin-framework
+[tfplugindocs]: https://github.com/hashicorp/terraform-plugin-docs
