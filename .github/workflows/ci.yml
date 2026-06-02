@@ -42,3 +42,23 @@ jobs:
       - uses: golangci/golangci-lint-action@v6
         with:
           version: v2.12.1
+
+  docs:
+    name: docs up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: verify generated docs
+        run: |
+          go tool tfplugindocs generate \
+            --provider-name googleworkspace \
+            --rendered-provider-name "Google Workspace" \
+            --tf-version 1.9.8
+          git diff --exit-code -- docs/ || {
+            echo "::error::generated docs are stale; run 'just docs' and commit";
+            exit 1;
+          }
