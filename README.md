@@ -16,6 +16,29 @@ org actually manages. Resources are named `googleworkspace_*` (for example
 > data source that proves auth and connectivity end-to-end. Resources (users, groups,
 > org units, roles) land iteratively.
 
+## Authentication
+
+This provider authenticates with **domain-wide delegation (DWD) only**. A service
+account with DWD impersonates a Workspace admin user; the token is minted **keyless**
+from your Application Default Credentials, which must hold
+`roles/iam.serviceAccountTokenCreator` on the service account.
+
+```hcl
+provider "googleworkspace" {
+  service_account         = "tofu-workspace@my-project.iam.gserviceaccount.com"
+  impersonated_user_email = "admin@spokanemountaineers.org"
+}
+```
+
+Equivalent env vars: `GOOGLEWORKSPACE_SERVICE_ACCOUNT`,
+`GOOGLEWORKSPACE_IMPERSONATED_USER_EMAIL`, and `GOOGLEWORKSPACE_ACCESS_TOKEN` (a
+pre-minted DWD token, for CI). `customer_id` defaults to `my_customer`.
+
+The interactive user-token flow (`gcloud auth application-default login`) is **not
+supported** — Workspace API controls block the shared gcloud OAuth client from
+sensitive Admin SDK scopes. Full setup is in
+[docs/guides/authentication.md](./docs/guides/authentication.md).
+
 ## Development
 
 Requires Go 1.26.3 and [`just`](https://github.com/casey/just).
@@ -36,9 +59,9 @@ just docs       # regenerate registry docs (docs/) from schema + templates + exa
 
 The `docs/` tree is what the OpenTofu/Terraform registry renders. It is **generated**
 by [`tfplugindocs`][tfplugindocs] (pinned as a Go tool dependency) from the provider
-schema, the `templates/` (rich Overview in `templates/index.md.tmpl`), and the
-`examples/` `.tf` files. Edit those sources — not `docs/` — and run `just docs`. CI
-fails if the committed `docs/` are stale.
+schema, the `templates/` (rich Overview in `templates/index.md.tmpl` and guides under
+`templates/guides/`), and the `examples/` `.tf` files. Edit those sources — not
+`docs/` — and run `just docs`. CI fails if the committed `docs/` are stale.
 
 To use a local build, point your CLI config at the filesystem mirror after
 `just install`, e.g. in `~/.terraformrc`:

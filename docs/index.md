@@ -22,9 +22,12 @@ Resources are named `googleworkspace_*` (for example `googleworkspace_user`).
 ## Example Usage
 
 ```terraform
-# Authenticate with a keyless admin user token via Application Default Credentials.
-# Run a scoped `gcloud auth application-default login` first (see Authentication below).
+# Domain-wide delegation: the service account impersonates an admin user. The token is
+# minted keyless from your Application Default Credentials, which must hold
+# roles/iam.serviceAccountTokenCreator on the service account. See the Authentication guide.
 provider "googleworkspace" {
+  service_account         = "tofu-workspace@my-project.iam.gserviceaccount.com"
+  impersonated_user_email = "admin@example.com"
   # customer_id = "my_customer" # optional; defaults to my_customer
 }
 
@@ -38,35 +41,26 @@ output "domains" {
 
 ## Authentication
 
-The provider's first-class credential model is a **keyless admin user token**. An
-operator who is a Workspace super admin authenticates with Application Default
-Credentials, scoped to the Admin SDK:
+This provider authenticates with **domain-wide delegation (DWD) only**. A service
+account with DWD impersonates a Workspace admin user (the *subject*); the token is
+minted **keyless** from the caller's Application Default Credentials, which must hold
+`roles/iam.serviceAccountTokenCreator` on the service account.
 
-```shell
-gcloud auth application-default login --scopes=openid,\
-https://www.googleapis.com/auth/admin.directory.user,\
-https://www.googleapis.com/auth/admin.directory.group,\
-https://www.googleapis.com/auth/admin.directory.group.member,\
-https://www.googleapis.com/auth/admin.directory.orgunit,\
-https://www.googleapis.com/auth/admin.directory.rolemanagement,\
-https://www.googleapis.com/auth/admin.directory.domain.readonly,\
-https://www.googleapis.com/auth/admin.directory.userschema
-```
+Configure it with the `service_account` and `impersonated_user_email` attributes (or
+the `GOOGLEWORKSPACE_SERVICE_ACCOUNT` / `GOOGLEWORKSPACE_IMPERSONATED_USER_EMAIL`
+environment variables). `GOOGLEWORKSPACE_ACCESS_TOKEN` accepts a pre-minted DWD token
+as a CI escape hatch.
 
-The provider resolves a token in this order:
-
-1. the `access_token` provider attribute,
-2. the `GOOGLEWORKSPACE_ACCESS_TOKEN` environment variable,
-3. Application Default Credentials.
-
-Use the read-only variants of the scopes above (`*.readonly`) for `plan` and
-`-refresh-only`; the read-write scopes are required for `apply`.
+~> The interactive user-token flow (`gcloud auth application-default login`) is **not
+supported** — Workspace API controls block the shared gcloud OAuth client from
+sensitive Admin SDK scopes. Use domain-wide delegation. Full setup is in the
+[Authentication guide](guides/authentication).
 
 ### Customer ID
 
 `customer_id` defaults to `my_customer`, the Admin SDK alias for the caller's own
-account. Set it explicitly via the provider attribute or the
-`GOOGLEWORKSPACE_CUSTOMER_ID` environment variable when managing another account.
+account. Set it explicitly via the attribute or `GOOGLEWORKSPACE_CUSTOMER_ID` when
+managing another account.
 
 ## Reconciliation
 
@@ -81,8 +75,10 @@ resource implements `Read` and import, the standard drift workflow applies: use
 
 ### Optional
 
-- `access_token` (String, Sensitive) OAuth2 access token with Admin SDK directory scopes. If unset, falls back to `GOOGLEWORKSPACE_ACCESS_TOKEN` and then Application Default Credentials.
+- `access_token` (String, Sensitive) Escape hatch: a pre-minted domain-wide delegation access token (for example in CI). Takes precedence over `service_account`/`impersonated_user_email`. Also settable via `GOOGLEWORKSPACE_ACCESS_TOKEN`.
 - `customer_id` (String) Workspace customer ID. Defaults to `my_customer`. Also settable via `GOOGLEWORKSPACE_CUSTOMER_ID`.
+- `impersonated_user_email` (String) The Workspace admin user the service account impersonates (the delegation subject). Also settable via `GOOGLEWORKSPACE_IMPERSONATED_USER_EMAIL`.
+- `service_account` (String) Email of the service account with domain-wide delegation. The caller's Application Default Credentials must hold `roles/iam.serviceAccountTokenCreator` on it so the delegation token is minted keyless. Also settable via `GOOGLEWORKSPACE_SERVICE_ACCOUNT`.
 
 [admin-sdk]: https://developers.google.com/admin-sdk/directory
 [cloud-identity]: https://cloud.google.com/identity/docs/reference/rest
