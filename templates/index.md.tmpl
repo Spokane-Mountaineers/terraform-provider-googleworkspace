@@ -1,0 +1,72 @@
+---
+page_title: "{{ .RenderedProviderName }} Provider"
+description: |-
+  Manage Google Workspace directory resources with OpenTofu and Terraform, built on
+  Google's supported Admin SDK Directory and Cloud Identity APIs.
+---
+
+# {{ .RenderedProviderName }} Provider
+
+The {{ .RenderedProviderName }} provider manages Google Workspace **directory**
+resources — users, groups, organizational units, roles, and more — as code, on top
+of Google's supported [Admin SDK Directory API][admin-sdk] and
+[Cloud Identity API][cloud-identity].
+
+It exists because there is no actively-maintained, comprehensive Terraform provider
+for Workspace: HashiCorp's `googleworkspace` was a tech preview, last released v0.7.0
+in June 2022, and was archived in 2025. This is a thin, purpose-built provider on the
+[Terraform Plugin Framework][framework], scoped to what we actually manage.
+
+~> **Resource naming.** The repository is `terraform-provider-google-workspace`, but
+Terraform resource type prefixes cannot contain hyphens, so resources are named
+`googleworkspace_*` (for example `googleworkspace_user`).
+
+## Example Usage
+
+{{ tffile "examples/provider/provider.tf" }}
+
+## Authentication
+
+The provider's first-class credential model is a **keyless admin user token**. An
+operator who is a Workspace super admin authenticates with Application Default
+Credentials, scoped to the Admin SDK:
+
+```shell
+gcloud auth application-default login --scopes=openid,\
+https://www.googleapis.com/auth/admin.directory.user,\
+https://www.googleapis.com/auth/admin.directory.group,\
+https://www.googleapis.com/auth/admin.directory.group.member,\
+https://www.googleapis.com/auth/admin.directory.orgunit,\
+https://www.googleapis.com/auth/admin.directory.rolemanagement,\
+https://www.googleapis.com/auth/admin.directory.domain.readonly,\
+https://www.googleapis.com/auth/admin.directory.userschema
+```
+
+The provider resolves a token in this order:
+
+1. the `access_token` provider attribute,
+2. the `GOOGLEWORKSPACE_ACCESS_TOKEN` environment variable,
+3. Application Default Credentials.
+
+Use the read-only variants of the scopes above (`*.readonly`) for `plan` and
+`-refresh-only`; the read-write scopes are required for `apply`.
+
+### Customer ID
+
+`customer_id` defaults to `my_customer`, the Admin SDK alias for the caller's own
+account. Set it explicitly via the provider attribute or the
+`GOOGLEWORKSPACE_CUSTOMER_ID` environment variable when managing another account.
+
+## Reconciliation
+
+Workspace admins frequently make ad-hoc changes in the Admin console. Because every
+resource implements `Read` and import, the standard drift workflow applies: use
+`-refresh-only` to pull remote changes into state, `import` blocks with
+`-generate-config-out` to adopt resources created outside of code, and a normal
+`plan` to review remaining drift before applying intended updates.
+
+{{ .SchemaMarkdown | trimspace }}
+
+[admin-sdk]: https://developers.google.com/admin-sdk/directory
+[cloud-identity]: https://cloud.google.com/identity/docs/reference/rest
+[framework]: https://github.com/hashicorp/terraform-plugin-framework

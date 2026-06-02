@@ -72,7 +72,18 @@ just test       # unit tests
 just ci         # fmt-check + vet + lint + test
 just build      # build the provider binary
 just install    # build into ~/.terraform.d/plugins filesystem mirror
+just docs       # regenerate registry docs (docs/) from schema + templates + examples
 ```
+
+### Registry documentation
+
+The `docs/` tree is what the OpenTofu/Terraform registry renders. It is **generated**
+by [`tfplugindocs`][tfplugindocs] (pinned as a Go tool dependency) from the provider
+schema, the `templates/` (rich Overview in `templates/index.md.tmpl`), and the
+`examples/` `.tf` files. Edit those sources — not `docs/` — and run `just docs`. CI
+fails if the committed `docs/` are stale.
+
+[tfplugindocs]: https://github.com/hashicorp/terraform-plugin-docs
 
 To use a local build, point your CLI config at the filesystem mirror after
 `just install`, e.g. in `~/.terraformrc`:

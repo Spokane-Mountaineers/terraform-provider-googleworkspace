@@ -8,6 +8,10 @@ mirror_host := "registry.spokanemountaineers.org"
 mirror_ns := "spokane-mountaineers"
 mirror_type := "google-workspace"
 version := "0.0.0-dev"
+# Resource type prefix (hyphen-free); also the tfplugindocs provider name.
+provider_name := "googleworkspace"
+# Terraform binary version tfplugindocs downloads for schema export (doc-build only).
+tf_version := "1.9.8"
 
 # List available recipes.
 default:
@@ -68,6 +72,17 @@ install: build
     mkdir -p "${dest}"
     cp {{ binary }} "${dest}/{{ binary }}_v{{ version }}"
     echo "installed to ${dest}"
+
+# Generate registry documentation (docs/) from schema, templates, and examples.
+docs:
+    go tool tfplugindocs generate \
+        --provider-name {{ provider_name }} \
+        --rendered-provider-name "Google Workspace" \
+        --tf-version {{ tf_version }}
+
+# Verify generated docs are current; fails if `just docs` would change anything.
+docs-check: docs
+    @git diff --exit-code -- docs/ || { echo "docs out of date: run 'just docs' and commit"; exit 1; }
 
 # Full local check: format, vet, lint, test.
 ci: fmt-check vet lint test
