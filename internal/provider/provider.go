@@ -20,8 +20,10 @@ type googleWorkspaceProvider struct {
 }
 
 type providerModel struct {
-	CustomerID  types.String `tfsdk:"customer_id"`
-	AccessToken types.String `tfsdk:"access_token"`
+	CustomerID            types.String `tfsdk:"customer_id"`
+	ServiceAccount        types.String `tfsdk:"service_account"`
+	ImpersonatedUserEmail types.String `tfsdk:"impersonated_user_email"`
+	AccessToken           types.String `tfsdk:"access_token"`
 }
 
 // New returns a provider factory for the given build version.
@@ -32,24 +34,36 @@ func New(version string) func() provider.Provider {
 }
 
 func (p *googleWorkspaceProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	// Resource/data-source prefix. Hyphen-free because Terraform type names must
-	// be valid identifiers, so resources are googleworkspace_*.
 	resp.TypeName = "googleworkspace"
 	resp.Version = p.version
 }
 
 func (p *googleWorkspaceProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manage Google Workspace directory resources via the Admin SDK Directory and Cloud Identity APIs.",
+		MarkdownDescription: "Manage Google Workspace directory resources via the Admin SDK Directory and Cloud Identity APIs. " +
+			"Authentication is **domain-wide delegation only** — see the provider guide.",
 		Attributes: map[string]schema.Attribute{
+			"service_account": schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "Email of the service account with domain-wide delegation. The caller's " +
+					"Application Default Credentials must hold `roles/iam.serviceAccountTokenCreator` on it so the " +
+					"delegation token is minted keyless. Also settable via `GOOGLEWORKSPACE_SERVICE_ACCOUNT`.",
+			},
+			"impersonated_user_email": schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "The Workspace admin user the service account impersonates (the delegation " +
+					"subject). Also settable via `GOOGLEWORKSPACE_IMPERSONATED_USER_EMAIL`.",
+			},
+			"access_token": schema.StringAttribute{
+				Optional:  true,
+				Sensitive: true,
+				MarkdownDescription: "Escape hatch: a pre-minted domain-wide delegation access token (for example in " +
+					"CI). Takes precedence over `service_account`/`impersonated_user_email`. Also settable via " +
+					"`GOOGLEWORKSPACE_ACCESS_TOKEN`.",
+			},
 			"customer_id": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "Workspace customer ID. Defaults to `my_customer`. Also settable via `GOOGLEWORKSPACE_CUSTOMER_ID`.",
-			},
-			"access_token": schema.StringAttribute{
-				Optional:            true,
-				Sensitive:           true,
-				MarkdownDescription: "OAuth2 access token with Admin SDK directory scopes. If unset, falls back to `GOOGLEWORKSPACE_ACCESS_TOKEN` and then Application Default Credentials.",
 			},
 		},
 	}
@@ -63,8 +77,10 @@ func (p *googleWorkspaceProvider) Configure(ctx context.Context, req provider.Co
 	}
 
 	c, err := client.New(ctx, client.Config{
-		CustomerID:  cfg.CustomerID.ValueString(),
-		AccessToken: cfg.AccessToken.ValueString(),
+		CustomerID:            cfg.CustomerID.ValueString(),
+		ServiceAccount:        cfg.ServiceAccount.ValueString(),
+		ImpersonatedUserEmail: cfg.ImpersonatedUserEmail.ValueString(),
+		AccessToken:           cfg.AccessToken.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to configure Google Workspace client", err.Error())

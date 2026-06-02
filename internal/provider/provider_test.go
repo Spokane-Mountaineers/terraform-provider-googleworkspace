@@ -32,7 +32,7 @@ func TestProvider_Schema(t *testing.T) {
 	if resp.Diagnostics.HasError() {
 		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
 	}
-	for _, attr := range []string{"customer_id", "access_token"} {
+	for _, attr := range []string{"service_account", "impersonated_user_email", "access_token", "customer_id"} {
 		if _, ok := resp.Schema.Attributes[attr]; !ok {
 			t.Errorf("missing provider attribute %q", attr)
 		}
