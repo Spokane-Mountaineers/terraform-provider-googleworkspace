@@ -94,6 +94,7 @@ func (p *googleWorkspaceProvider) Configure(ctx context.Context, req provider.Co
 func (p *googleWorkspaceProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewOrgUnitResource,
+		NewGroupResource,
 	}
 }
 
@@ -101,5 +102,6 @@ func (p *googleWorkspaceProvider) DataSources(_ context.Context) []func() dataso
 	return []func() datasource.DataSource{
 		NewDomainsDataSource,
 		NewOrgUnitDataSource,
+		NewGroupDataSource,
 	}
 }
