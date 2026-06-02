@@ -16,50 +16,6 @@ org actually manages. Resources are named `googleworkspace_*` (for example
 > data source that proves auth and connectivity end-to-end. Resources (users, groups,
 > org units, roles) land iteratively.
 
-## Authentication
-
-The first supported credential model is a **keyless admin user token**. An operator
-who is a Workspace super admin authenticates with Application Default Credentials,
-scoped to the Admin SDK:
-
-```bash
-gcloud auth application-default login --scopes=openid,\
-https://www.googleapis.com/auth/admin.directory.user,\
-https://www.googleapis.com/auth/admin.directory.group,\
-https://www.googleapis.com/auth/admin.directory.group.member,\
-https://www.googleapis.com/auth/admin.directory.orgunit,\
-https://www.googleapis.com/auth/admin.directory.rolemanagement,\
-https://www.googleapis.com/auth/admin.directory.domain.readonly,\
-https://www.googleapis.com/auth/admin.directory.userschema
-```
-
-Credential precedence:
-
-1. provider `access_token` attribute
-2. `GOOGLEWORKSPACE_ACCESS_TOKEN`
-3. Application Default Credentials
-
-`customer_id` defaults to `my_customer` and may be set via the provider attribute or
-`GOOGLEWORKSPACE_CUSTOMER_ID`.
-
-> **"This app is blocked".** Workspace's API access controls can block the OAuth
-> client used by the login above from sensitive Admin SDK scopes. An admin must mark
-> the client **Trusted** under Admin console → Security → Access and data control →
-> API controls → App access control, or use a dedicated OAuth client / a service
-> account with domain-wide delegation. See [docs/index.md](./docs/index.md).
-
-```hcl
-provider "googleworkspace" {
-  # customer_id = "my_customer"  # optional
-}
-
-data "googleworkspace_domains" "this" {}
-
-output "domains" {
-  value = data.googleworkspace_domains.this.domains
-}
-```
-
 ## Development
 
 Requires Go 1.26.3 and [`just`](https://github.com/casey/just).
