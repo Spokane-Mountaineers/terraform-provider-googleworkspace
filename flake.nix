@@ -2,7 +2,7 @@
   description = "OpenTofu/Terraform provider for Google Workspace";
 
   inputs = {
-    # Own pin: go.mod needs Go >= 1.26.3, newer than some consumers' nixpkgs.
+    # Own pin: go.mod needs Go >= 1.27.3, newer than some consumers' nixpkgs.
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
   };
 
@@ -21,7 +21,8 @@
     in
     {
       packages = forAllSystems (pkgs: rec {
-        default = pkgs.buildGoModule {
+        # Match go.mod's toolchain; nixpkgs' default `go` lags a minor release.
+        default = (pkgs.buildGoModule.override { go = pkgs.go_1_27; }) {
           pname = "terraform-provider-googleworkspace";
           inherit version ldflags;
           src = self;

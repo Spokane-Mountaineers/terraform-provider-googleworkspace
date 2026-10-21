@@ -41,7 +41,7 @@ sensitive Admin SDK scopes. Full setup is in
 
 ## Development
 
-Requires Go 1.26.3 and [`just`](https://github.com/casey/just).
+Requires Go 1.27.3 and [`just`](https://github.com/casey/just).
 
 ```bash
 just            # list recipes
