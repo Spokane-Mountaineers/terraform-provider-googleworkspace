@@ -12,9 +12,9 @@ org actually manages. Resources are named `googleworkspace_*` (for example
 `googleworkspace_user`). The provider source address is
 `registry.opentofu.org/spokane-mountaineers/googleworkspace`.
 
-> **Status:** early. Today it ships the provider skeleton and a `googleworkspace_domains`
-> data source that proves auth and connectivity end-to-end. Resources (users, groups,
-> org units, roles) land iteratively.
+> **Status:** early. It ships `googleworkspace_user`, `googleworkspace_org_unit`,
+> `googleworkspace_group` and `googleworkspace_group_member` resources, plus `domains`,
+> `users`, `org_unit` and `group` data sources. Roles and group settings come next.
 
 ## Authentication
 
