@@ -54,7 +54,9 @@ type Client struct {
 func New(ctx context.Context, cfg Config) (*Client, error) {
 	customerID := firstNonEmpty(cfg.CustomerID, os.Getenv("GOOGLEWORKSPACE_CUSTOMER_ID"), DefaultCustomerID)
 
-	ts, err := tokenSource(ctx, cfg)
+	// The token source refreshes lazily, long after the caller's context (the
+	// provider's Configure request) has been canceled, so detach from it.
+	ts, err := tokenSource(context.WithoutCancel(ctx), cfg)
 	if err != nil {
 		return nil, err
 	}
