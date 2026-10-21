@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -35,6 +36,22 @@ func TestUserResource_Schema(t *testing.T) {
 	pw, ok := resp.Schema.Attributes["password_wo"].(schema.StringAttribute)
 	if !ok || !pw.WriteOnly || !pw.Sensitive {
 		t.Error("password_wo must be a sensitive, write-only string")
+	}
+}
+
+func TestUsersDataSource_Schema(t *testing.T) {
+	t.Parallel()
+
+	var resp datasource.SchemaResponse
+	NewUsersDataSource().Schema(context.Background(), datasource.SchemaRequest{}, &resp)
+
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
+	}
+	for _, attr := range []string{"query", "users"} {
+		if _, ok := resp.Schema.Attributes[attr]; !ok {
+			t.Errorf("data source missing attribute %q", attr)
+		}
 	}
 }
 
