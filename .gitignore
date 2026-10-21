@@ -25,3 +25,5 @@ terraform.rc
 .idea/
 .vscode/
 *.swp
+result
+result-*
