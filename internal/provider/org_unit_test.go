@@ -37,3 +37,17 @@ func TestOrgUnitDataSource_Schema(t *testing.T) {
 		t.Error("data source missing required attribute \"org_unit_path\"")
 	}
 }
+
+func TestOrgUnitsDataSource_Schema(t *testing.T) {
+	t.Parallel()
+
+	var resp datasource.SchemaResponse
+	NewOrgUnitsDataSource().Schema(context.Background(), datasource.SchemaRequest{}, &resp)
+
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
+	}
+	if _, ok := resp.Schema.Attributes["org_units"]; !ok {
+		t.Error("data source missing attribute \"org_units\"")
+	}
+}
