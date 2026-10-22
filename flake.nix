@@ -9,7 +9,7 @@
   outputs = { self, nixpkgs }:
     let
       # Keep in step with the release tag; consumers pin this exact version.
-      version = "0.1.4";
+      version = "0.1.5";
 
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
@@ -26,7 +26,7 @@
           pname = "terraform-provider-googleworkspace";
           inherit version ldflags;
           src = self;
-          vendorHash = "sha256-HpyziardmV1pitT3gW8Gp6Dd8dOISJ70m7Lp5Dtu6lM=";
+          vendorHash = "sha256-w0BY5KgIvR2H5c13hSExd/YD26H0wCAwy1vbTR1XU/M=";
           subPackages = [ "." ];
           env.CGO_ENABLED = "0";
         };
