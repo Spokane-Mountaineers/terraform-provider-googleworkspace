@@ -48,7 +48,8 @@ func (r *gmailDelegateResource) Schema(_ context.Context, _ resource.SchemaReque
 		MarkdownDescription: "Gives one user access to another user's Gmail mailbox (mail delegation). The delegate " +
 			"can read, send, and delete mail in the mailbox from their own account, without its password.\n\n" +
 			"This suits role mailboxes such as `treasurer@`: the mailbox keeps its history and filters while the " +
-			"people holding the role change. Hand a role over by adding the new holder, then removing the old one.\n\n" +
+			"people holding the role change. The delegate can be a group, so handing a role over becomes a membership " +
+			"change: add the new holder to the group, then remove the old one.\n\n" +
 			"Delegates are added as `accepted` immediately, with no invitation email, though Google notes they can " +
 			"take up to a minute to become usable. Both users must be in this Workspace account, and Google " +
 			"generally allows up to 25 delegates per mailbox.\n\n" +
@@ -72,8 +73,10 @@ func (r *gmailDelegateResource) Schema(_ context.Context, _ resource.SchemaReque
 			"delegate_email": schema.StringAttribute{
 				Required:      true,
 				PlanModifiers: requiresReplace,
-				MarkdownDescription: "Primary email (not an alias) of the user who gets access. Must be a user in the " +
-					"same Workspace account.",
+				MarkdownDescription: "Primary email (not an alias) of the user or group that gets access. A group grants " +
+					"access to all of its members who are users in this Workspace account (not external members), and " +
+					"requires group delegation to be allowed in the Admin console. Google's API reference only mentions " +
+					"users, but group delegates were verified to work.",
 			},
 			"verification_status": schema.StringAttribute{
 				Computed:            true,

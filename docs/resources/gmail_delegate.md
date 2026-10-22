@@ -4,7 +4,7 @@ page_title: "googleworkspace_gmail_delegate Resource - Google Workspace"
 subcategory: ""
 description: |-
   Gives one user access to another user's Gmail mailbox (mail delegation). The delegate can read, send, and delete mail in the mailbox from their own account, without its password.
-  This suits role mailboxes such as treasurer@: the mailbox keeps its history and filters while the people holding the role change. Hand a role over by adding the new holder, then removing the old one.
+  This suits role mailboxes such as treasurer@: the mailbox keeps its history and filters while the people holding the role change. The delegate can be a group, so handing a role over becomes a membership change: add the new holder to the group, then remove the old one.
   Delegates are added as accepted immediately, with no invitation email, though Google notes they can take up to a minute to become usable. Both users must be in this Workspace account, and Google generally allows up to 25 delegates per mailbox.
   ~> Requirements: the provider must use service_account (the call impersonates the mailbox owner, so a pre-minted access_token cannot be used), the service account's domain-wide delegation must include the https://www.googleapis.com/auth/gmail.settings.basic (read) and https://www.googleapis.com/auth/gmail.settings.sharing (create/delete) scopes, the Gmail API must be enabled in its project, and Mail delegation must be enabled in the Admin console for the mailbox's organizational unit.
 ---
@@ -13,7 +13,7 @@ description: |-
 
 Gives one user access to another user's Gmail mailbox (mail delegation). The delegate can read, send, and delete mail in the mailbox from their own account, without its password.
 
-This suits role mailboxes such as `treasurer@`: the mailbox keeps its history and filters while the people holding the role change. Hand a role over by adding the new holder, then removing the old one.
+This suits role mailboxes such as `treasurer@`: the mailbox keeps its history and filters while the people holding the role change. The delegate can be a group, so handing a role over becomes a membership change: add the new holder to the group, then remove the old one.
 
 Delegates are added as `accepted` immediately, with no invitation email, though Google notes they can take up to a minute to become usable. Both users must be in this Workspace account, and Google generally allows up to 25 delegates per mailbox.
 
@@ -23,15 +23,24 @@ Delegates are added as `accepted` immediately, with no invitation email, though 
 
 ```terraform
 # The treasurer role mailbox keeps its history and filters; the people holding the
-# role read and send from their own accounts. To hand the role over, add the new
-# treasurer, then remove the outgoing one once the overlap is done.
-resource "googleworkspace_gmail_delegate" "treasurer" {
-  for_each = toset([
-    "jdoe@example.org",
-  ])
+# role open it from their own accounts. Delegating to a group makes handing the
+# role over a membership change: add the incoming treasurer, then remove the
+# outgoing one once the overlap is done.
+resource "googleworkspace_group" "treasurer_delegates" {
+  email       = "treasurer-delegates@example.org"
+  name        = "Treasurer delegates"
+  description = "Access list for treasurer@. Not a mailing list."
+}
 
+resource "googleworkspace_group_member" "treasurer" {
+  group_id          = googleworkspace_group.treasurer_delegates.id
+  email             = "jdoe@example.org"
+  delivery_settings = "NONE"
+}
+
+resource "googleworkspace_gmail_delegate" "treasurer" {
   user_email     = "treasurer@example.org"
-  delegate_email = each.value
+  delegate_email = googleworkspace_group.treasurer_delegates.email
 }
 ```
 
@@ -40,7 +49,7 @@ resource "googleworkspace_gmail_delegate" "treasurer" {
 
 ### Required
 
-- `delegate_email` (String) Primary email (not an alias) of the user who gets access. Must be a user in the same Workspace account.
+- `delegate_email` (String) Primary email (not an alias) of the user or group that gets access. A group grants access to all of its members who are users in this Workspace account (not external members), and requires group delegation to be allowed in the Admin console. Google's API reference only mentions users, but group delegates were verified to work.
 - `user_email` (String) Primary email of the mailbox being shared, e.g. `treasurer@example.org`.
 
 ### Read-Only
@@ -56,5 +65,5 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 
 ```shell
 # Delegations are imported as <mailbox>/<delegate>.
-terraform import 'googleworkspace_gmail_delegate.treasurer["jdoe@example.org"]' treasurer@example.org/jdoe@example.org
+terraform import googleworkspace_gmail_delegate.treasurer treasurer@example.org/treasurer-delegates@example.org
 ```
