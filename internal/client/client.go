@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/oauth2"
 	admin "google.golang.org/api/admin/directory/v1"
+	"google.golang.org/api/cloudidentity/v1"
 	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/impersonate"
 	"google.golang.org/api/option"
@@ -37,6 +38,10 @@ var DefaultScopes = []string{
 // need not authorize it.
 const GmailSharingScope = gmail.GmailSettingsSharingScope
 
+// PoliciesScope is requested only for Cloud Identity Policy API reads, with its own
+// token, so stacks that do not read policies need not authorize it.
+const PoliciesScope = cloudidentity.CloudIdentityPoliciesScope
+
 // Config holds the resolved provider configuration.
 type Config struct {
 	CustomerID            string
@@ -50,11 +55,14 @@ type Client struct {
 	CustomerID string
 	Directory  *admin.Service
 
-	// For per-mailbox Gmail clients; empty when using a pre-minted access token.
+	// For clients that need their own delegation token (a different subject or
+	// scope); unset when using a pre-minted access token.
 	ctx            context.Context
 	serviceAccount string
+	adminSubject   string
 	mu             sync.Mutex
 	gmail          map[string]*gmail.Service
+	policies       *cloudidentity.Service
 }
 
 // New resolves credentials and constructs the Admin SDK Directory client.
@@ -84,6 +92,7 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 		Directory:      dir,
 		ctx:            context.WithoutCancel(ctx),
 		serviceAccount: firstNonEmpty(cfg.ServiceAccount, os.Getenv("GOOGLEWORKSPACE_SERVICE_ACCOUNT")),
+		adminSubject:   firstNonEmpty(cfg.ImpersonatedUserEmail, os.Getenv("GOOGLEWORKSPACE_IMPERSONATED_USER_EMAIL")),
 		gmail:          map[string]*gmail.Service{},
 	}, nil
 }
@@ -98,18 +107,9 @@ func (c *Client) GmailFor(mailbox string) (*gmail.Service, error) {
 	if svc, ok := c.gmail[mailbox]; ok {
 		return svc, nil
 	}
-	if c.serviceAccount == "" {
-		return nil, fmt.Errorf("managing Gmail settings for %s requires service_account (domain-wide "+
-			"delegation impersonating each mailbox); a pre-minted access token cannot do this", mailbox)
-	}
-
-	ts, err := impersonate.CredentialsTokenSource(c.ctx, impersonate.CredentialsConfig{
-		TargetPrincipal: c.serviceAccount,
-		Scopes:          []string{GmailSharingScope},
-		Subject:         mailbox,
-	})
+	ts, err := c.delegatedTokenSource(mailbox, GmailSharingScope)
 	if err != nil {
-		return nil, fmt.Errorf("configuring domain-wide delegation for %s as %s: %w", c.serviceAccount, mailbox, err)
+		return nil, err
 	}
 	svc, err := gmail.NewService(c.ctx, option.WithTokenSource(ts))
 	if err != nil {
@@ -117,6 +117,46 @@ func (c *Client) GmailFor(mailbox string) (*gmail.Service, error) {
 	}
 	c.gmail[mailbox] = svc
 	return svc, nil
+}
+
+// Policies returns a Cloud Identity client for the Policy API, acting as the admin
+// subject with only PoliciesScope.
+func (c *Client) Policies() (*cloudidentity.Service, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.policies != nil {
+		return c.policies, nil
+	}
+	ts, err := c.delegatedTokenSource(c.adminSubject, PoliciesScope)
+	if err != nil {
+		return nil, err
+	}
+	svc, err := cloudidentity.NewService(c.ctx, option.WithTokenSource(ts))
+	if err != nil {
+		return nil, fmt.Errorf("creating Cloud Identity client: %w", err)
+	}
+	c.policies = svc
+	return svc, nil
+}
+
+// delegatedTokenSource mints domain-wide delegation tokens for subject with only
+// the given scope. It needs service_account; a pre-minted token has a fixed
+// subject and scope set.
+func (c *Client) delegatedTokenSource(subject, scope string) (oauth2.TokenSource, error) {
+	if c.serviceAccount == "" || subject == "" {
+		return nil, fmt.Errorf("requesting %s as %q requires service_account and a subject (domain-wide "+
+			"delegation); a pre-minted access token cannot do this", scope, subject)
+	}
+	ts, err := impersonate.CredentialsTokenSource(c.ctx, impersonate.CredentialsConfig{
+		TargetPrincipal: c.serviceAccount,
+		Scopes:          []string{scope},
+		Subject:         subject,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("configuring domain-wide delegation for %s as %s: %w", c.serviceAccount, subject, err)
+	}
+	return ts, nil
 }
 
 func tokenSource(ctx context.Context, cfg Config) (oauth2.TokenSource, error) {
