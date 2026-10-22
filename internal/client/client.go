@@ -1,5 +1,5 @@
 // Package client wraps the Google Workspace APIs the provider builds on:
-// the Admin SDK Directory API, and per-mailbox Gmail settings.
+// the Admin SDK Directory API, the Groups Settings API, and per-mailbox Gmail settings.
 package client
 
 import (
@@ -12,6 +12,7 @@ import (
 	admin "google.golang.org/api/admin/directory/v1"
 	"google.golang.org/api/cloudidentity/v1"
 	"google.golang.org/api/gmail/v1"
+	"google.golang.org/api/groupssettings/v1"
 	"google.golang.org/api/impersonate"
 	"google.golang.org/api/option"
 )
@@ -43,6 +44,10 @@ var GmailScopes = []string{gmail.GmailSettingsBasicScope, gmail.GmailSettingsSha
 // token, so stacks that do not read policies need not authorize it.
 const PoliciesScope = cloudidentity.CloudIdentityPoliciesScope
 
+// GroupSettingsScope is requested only for Groups Settings API calls, with its own
+// token, so stacks that do not manage group settings need not authorize it.
+const GroupSettingsScope = groupssettings.AppsGroupsSettingsScope
+
 // Config holds the resolved provider configuration.
 type Config struct {
 	CustomerID            string
@@ -64,6 +69,7 @@ type Client struct {
 	mu             sync.Mutex
 	gmail          map[string]*gmail.Service
 	policies       *cloudidentity.Service
+	groupSettings  *groupssettings.Service
 }
 
 // New resolves credentials and constructs the Admin SDK Directory client.
@@ -138,6 +144,27 @@ func (c *Client) Policies() (*cloudidentity.Service, error) {
 		return nil, fmt.Errorf("creating Cloud Identity client: %w", err)
 	}
 	c.policies = svc
+	return svc, nil
+}
+
+// GroupSettings returns a Groups Settings API client, acting as the admin subject
+// with only GroupSettingsScope.
+func (c *Client) GroupSettings() (*groupssettings.Service, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.groupSettings != nil {
+		return c.groupSettings, nil
+	}
+	ts, err := c.delegatedTokenSource(c.adminSubject, GroupSettingsScope)
+	if err != nil {
+		return nil, err
+	}
+	svc, err := groupssettings.NewService(c.ctx, option.WithTokenSource(ts))
+	if err != nil {
+		return nil, fmt.Errorf("creating Groups Settings client: %w", err)
+	}
+	c.groupSettings = svc
 	return svc, nil
 }
 

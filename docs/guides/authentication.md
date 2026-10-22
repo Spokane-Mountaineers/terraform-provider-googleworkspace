@@ -65,6 +65,10 @@ These are read-write so the provider can both read (plan, import, refresh) and m
 (apply) directory resources. The scope set must exactly cover what the provider
 requests — a missing scope yields `unauthorized_client` when minting the token.
 
+`apps.groups.settings` is requested on its own token, only by
+`googleworkspace_group_settings`, which also needs the Groups Settings API enabled in
+the service account's project (`gcloud services enable groupssettings.googleapis.com`).
+
 #### Optional: Gmail delegation
 
 `googleworkspace_gmail_delegate` acts as each mailbox owner rather than the admin
