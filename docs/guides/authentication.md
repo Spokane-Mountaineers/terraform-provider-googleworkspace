@@ -65,6 +65,19 @@ These are read-write so the provider can both read (plan, import, refresh) and m
 (apply) directory resources. The scope set must exactly cover what the provider
 requests — a missing scope yields `unauthorized_client` when minting the token.
 
+#### Optional: Gmail delegation
+
+`googleworkspace_gmail_delegate` acts as each mailbox owner rather than the admin
+subject, using a separate token that requests only:
+
+```text
+https://www.googleapis.com/auth/gmail.settings.sharing
+```
+
+Add it to the same domain-wide delegation entry, and enable the Gmail API in the
+service account's project (`gcloud services enable gmail.googleapis.com`). Stacks that
+don't manage delegates never request this scope, so they work without it.
+
 ### 5. Grant the caller permission to mint tokens (keyless)
 
 ```shell

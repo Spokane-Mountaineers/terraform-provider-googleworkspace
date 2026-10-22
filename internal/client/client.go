@@ -1,14 +1,16 @@
 // Package client wraps the Google Workspace APIs the provider builds on:
-// the Admin SDK Directory API and (later) the Cloud Identity API.
+// the Admin SDK Directory API, and per-mailbox Gmail settings.
 package client
 
 import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 
 	"golang.org/x/oauth2"
 	admin "google.golang.org/api/admin/directory/v1"
+	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/impersonate"
 	"google.golang.org/api/option"
 )
@@ -30,6 +32,11 @@ var DefaultScopes = []string{
 	admin.AdminDirectoryUserschemaScope,
 }
 
+// GmailSharingScope is requested only for per-mailbox Gmail tokens (delegation
+// settings), never with DefaultScopes, so stacks that do not manage Gmail settings
+// need not authorize it.
+const GmailSharingScope = gmail.GmailSettingsSharingScope
+
 // Config holds the resolved provider configuration.
 type Config struct {
 	CustomerID            string
@@ -42,6 +49,12 @@ type Config struct {
 type Client struct {
 	CustomerID string
 	Directory  *admin.Service
+
+	// For per-mailbox Gmail clients; empty when using a pre-minted access token.
+	ctx            context.Context
+	serviceAccount string
+	mu             sync.Mutex
+	gmail          map[string]*gmail.Service
 }
 
 // New resolves credentials and constructs the Admin SDK Directory client.
@@ -66,7 +79,44 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 		return nil, fmt.Errorf("creating Admin SDK Directory client: %w", err)
 	}
 
-	return &Client{CustomerID: customerID, Directory: dir}, nil
+	return &Client{
+		CustomerID:     customerID,
+		Directory:      dir,
+		ctx:            context.WithoutCancel(ctx),
+		serviceAccount: firstNonEmpty(cfg.ServiceAccount, os.Getenv("GOOGLEWORKSPACE_SERVICE_ACCOUNT")),
+		gmail:          map[string]*gmail.Service{},
+	}, nil
+}
+
+// GmailFor returns a Gmail client acting as mailbox, which Gmail settings APIs
+// require: they only operate on the authenticated user's own mailbox. It mints a
+// domain-wide delegation token with mailbox as the subject and caches the client.
+func (c *Client) GmailFor(mailbox string) (*gmail.Service, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if svc, ok := c.gmail[mailbox]; ok {
+		return svc, nil
+	}
+	if c.serviceAccount == "" {
+		return nil, fmt.Errorf("managing Gmail settings for %s requires service_account (domain-wide "+
+			"delegation impersonating each mailbox); a pre-minted access token cannot do this", mailbox)
+	}
+
+	ts, err := impersonate.CredentialsTokenSource(c.ctx, impersonate.CredentialsConfig{
+		TargetPrincipal: c.serviceAccount,
+		Scopes:          []string{GmailSharingScope},
+		Subject:         mailbox,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("configuring domain-wide delegation for %s as %s: %w", c.serviceAccount, mailbox, err)
+	}
+	svc, err := gmail.NewService(c.ctx, option.WithTokenSource(ts))
+	if err != nil {
+		return nil, fmt.Errorf("creating Gmail client for %s: %w", mailbox, err)
+	}
+	c.gmail[mailbox] = svc
+	return svc, nil
 }
 
 func tokenSource(ctx context.Context, cfg Config) (oauth2.TokenSource, error) {
