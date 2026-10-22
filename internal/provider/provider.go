@@ -108,5 +108,7 @@ func (p *googleWorkspaceProvider) DataSources(_ context.Context) []func() dataso
 		NewGroupDataSource,
 		NewUsersDataSource,
 		NewOrgUnitsDataSource,
+		NewPoliciesDataSource,
+		NewRoleAssignmentsDataSource,
 	}
 }

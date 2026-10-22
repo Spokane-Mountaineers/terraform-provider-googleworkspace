@@ -78,6 +78,18 @@ Add it to the same domain-wide delegation entry, and enable the Gmail API in the
 service account's project (`gcloud services enable gmail.googleapis.com`). Stacks that
 don't manage delegates never request this scope, so they work without it.
 
+#### Optional: Policy API reads
+
+`googleworkspace_policies` reads Admin console settings through the Cloud Identity
+Policy API with its own token, requesting only:
+
+```text
+https://www.googleapis.com/auth/cloud-identity.policies
+```
+
+Add it to the domain-wide delegation entry and enable the Cloud Identity API
+(`gcloud services enable cloudidentity.googleapis.com`).
+
 ### 5. Grant the caller permission to mint tokens (keyless)
 
 ```shell
