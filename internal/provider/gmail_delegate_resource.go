@@ -54,7 +54,8 @@ func (r *gmailDelegateResource) Schema(_ context.Context, _ resource.SchemaReque
 			"generally allows up to 25 delegates per mailbox.\n\n" +
 			"~> **Requirements:** the provider must use `service_account` (the call impersonates the mailbox owner, " +
 			"so a pre-minted `access_token` cannot be used), the service account's domain-wide delegation must " +
-			"include the `https://www.googleapis.com/auth/gmail.settings.sharing` scope, the Gmail API must be " +
+			"include the `https://www.googleapis.com/auth/gmail.settings.basic` (read) and " +
+			"`https://www.googleapis.com/auth/gmail.settings.sharing` (create/delete) scopes, the Gmail API must be " +
 			"enabled in its project, and **Mail delegation** must be enabled in the Admin console for the " +
 			"mailbox's organizational unit.",
 		Attributes: map[string]schema.Attribute{

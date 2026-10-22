@@ -6,7 +6,7 @@ description: |-
   Gives one user access to another user's Gmail mailbox (mail delegation). The delegate can read, send, and delete mail in the mailbox from their own account, without its password.
   This suits role mailboxes such as treasurer@: the mailbox keeps its history and filters while the people holding the role change. Hand a role over by adding the new holder, then removing the old one.
   Delegates are added as accepted immediately, with no invitation email, though Google notes they can take up to a minute to become usable. Both users must be in this Workspace account, and Google generally allows up to 25 delegates per mailbox.
-  ~> Requirements: the provider must use service_account (the call impersonates the mailbox owner, so a pre-minted access_token cannot be used), the service account's domain-wide delegation must include the https://www.googleapis.com/auth/gmail.settings.sharing scope, the Gmail API must be enabled in its project, and Mail delegation must be enabled in the Admin console for the mailbox's organizational unit.
+  ~> Requirements: the provider must use service_account (the call impersonates the mailbox owner, so a pre-minted access_token cannot be used), the service account's domain-wide delegation must include the https://www.googleapis.com/auth/gmail.settings.basic (read) and https://www.googleapis.com/auth/gmail.settings.sharing (create/delete) scopes, the Gmail API must be enabled in its project, and Mail delegation must be enabled in the Admin console for the mailbox's organizational unit.
 ---
 
 # googleworkspace_gmail_delegate (Resource)
@@ -17,7 +17,7 @@ This suits role mailboxes such as `treasurer@`: the mailbox keeps its history an
 
 Delegates are added as `accepted` immediately, with no invitation email, though Google notes they can take up to a minute to become usable. Both users must be in this Workspace account, and Google generally allows up to 25 delegates per mailbox.
 
-~> **Requirements:** the provider must use `service_account` (the call impersonates the mailbox owner, so a pre-minted `access_token` cannot be used), the service account's domain-wide delegation must include the `https://www.googleapis.com/auth/gmail.settings.sharing` scope, the Gmail API must be enabled in its project, and **Mail delegation** must be enabled in the Admin console for the mailbox's organizational unit.
+~> **Requirements:** the provider must use `service_account` (the call impersonates the mailbox owner, so a pre-minted `access_token` cannot be used), the service account's domain-wide delegation must include the `https://www.googleapis.com/auth/gmail.settings.basic` (read) and `https://www.googleapis.com/auth/gmail.settings.sharing` (create/delete) scopes, the Gmail API must be enabled in its project, and **Mail delegation** must be enabled in the Admin console for the mailbox's organizational unit.
 
 ## Example Usage
 

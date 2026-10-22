@@ -33,10 +33,11 @@ var DefaultScopes = []string{
 	admin.AdminDirectoryUserschemaScope,
 }
 
-// GmailSharingScope is requested only for per-mailbox Gmail tokens (delegation
-// settings), never with DefaultScopes, so stacks that do not manage Gmail settings
-// need not authorize it.
-const GmailSharingScope = gmail.GmailSettingsSharingScope
+// GmailScopes are requested only for per-mailbox Gmail tokens, never with
+// DefaultScopes, so stacks that do not manage Gmail settings need not authorize
+// them. Delegates are created and deleted with gmail.settings.sharing but read with
+// gmail.settings.basic, the only read scope that grants no access to mail content.
+var GmailScopes = []string{gmail.GmailSettingsBasicScope, gmail.GmailSettingsSharingScope}
 
 // PoliciesScope is requested only for Cloud Identity Policy API reads, with its own
 // token, so stacks that do not read policies need not authorize it.
@@ -107,7 +108,7 @@ func (c *Client) GmailFor(mailbox string) (*gmail.Service, error) {
 	if svc, ok := c.gmail[mailbox]; ok {
 		return svc, nil
 	}
-	ts, err := c.delegatedTokenSource(mailbox, GmailSharingScope)
+	ts, err := c.delegatedTokenSource(mailbox, GmailScopes...)
 	if err != nil {
 		return nil, err
 	}
@@ -141,16 +142,16 @@ func (c *Client) Policies() (*cloudidentity.Service, error) {
 }
 
 // delegatedTokenSource mints domain-wide delegation tokens for subject with only
-// the given scope. It needs service_account; a pre-minted token has a fixed
+// the given scopes. It needs service_account; a pre-minted token has a fixed
 // subject and scope set.
-func (c *Client) delegatedTokenSource(subject, scope string) (oauth2.TokenSource, error) {
+func (c *Client) delegatedTokenSource(subject string, scopes ...string) (oauth2.TokenSource, error) {
 	if c.serviceAccount == "" || subject == "" {
-		return nil, fmt.Errorf("requesting %s as %q requires service_account and a subject (domain-wide "+
-			"delegation); a pre-minted access token cannot do this", scope, subject)
+		return nil, fmt.Errorf("requesting %v as %q requires service_account and a subject (domain-wide "+
+			"delegation); a pre-minted access token cannot do this", scopes, subject)
 	}
 	ts, err := impersonate.CredentialsTokenSource(c.ctx, impersonate.CredentialsConfig{
 		TargetPrincipal: c.serviceAccount,
-		Scopes:          []string{scope},
+		Scopes:          scopes,
 		Subject:         subject,
 	})
 	if err != nil {

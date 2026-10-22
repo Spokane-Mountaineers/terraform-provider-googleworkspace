@@ -71,8 +71,13 @@ requests — a missing scope yields `unauthorized_client` when minting the token
 subject, using a separate token that requests only:
 
 ```text
+https://www.googleapis.com/auth/gmail.settings.basic,
 https://www.googleapis.com/auth/gmail.settings.sharing
 ```
+
+Gmail requires `gmail.settings.sharing` to create or remove delegates, and one of
+several scopes to read them; `gmail.settings.basic` is the only one of those that
+grants no access to mail content.
 
 Add it to the same domain-wide delegation entry, and enable the Gmail API in the
 service account's project (`gcloud services enable gmail.googleapis.com`). Stacks that
