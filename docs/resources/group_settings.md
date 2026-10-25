@@ -62,6 +62,7 @@ resource "googleworkspace_group_settings" "hiking" {
 - `allow_external_members` (Boolean) Whether people outside the organization can be members. Workspace must also allow external members for the organization (Admin console > Apps > Google Groups for Business).
 - `allow_web_posting` (Boolean) Whether members can post from the Google Groups web interface, not only by email.
 - `archive_only` (Boolean) Makes the group read-only: new messages are rejected and `who_can_post_message` becomes `NONE_CAN_POST`. Turning it off resets `who_can_post_message` to `ALL_MANAGERS_CAN_POST`.
+- `enable_collaborative_inbox` (Boolean) Whether the group is a collaborative inbox, where members can take, assign, and resolve conversations. Google requires conversation history (`is_archived`) for collaborative inbox features ([Make a group a Collaborative Inbox](https://support.google.com/a/users/answer/10375787)). The Groups Settings API reference does not say whether it rejects `true` while `is_archived` is false, so the plan warns about that combination instead of failing.
 - `include_in_global_address_list` (Boolean) Whether the group appears in the Global Address List and in address autocomplete.
 - `is_archived` (Boolean) Whether messages sent to the group are kept in its web archive.
 - `members_can_post_as_the_group` (Boolean) Whether members can send mail with the group's address as the sender.

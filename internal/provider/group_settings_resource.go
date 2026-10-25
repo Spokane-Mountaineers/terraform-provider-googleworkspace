@@ -162,6 +162,16 @@ var groupSettings = []groupSetting{
 		set:         func(g *groupssettings.Groups, v string) { g.IsArchived = v },
 	},
 	{
+		name: "enable_collaborative_inbox",
+		description: "Whether the group is a collaborative inbox, where members can take, assign, and resolve " +
+			"conversations. Google requires conversation history (`is_archived`) for collaborative inbox features " +
+			"([Make a group a Collaborative Inbox](https://support.google.com/a/users/answer/10375787)). The Groups " +
+			"Settings API reference does not say whether it rejects `true` while `is_archived` is false, so the plan " +
+			"warns about that combination instead of failing.",
+		get: func(g *groupssettings.Groups) string { return g.EnableCollaborativeInbox },
+		set: func(g *groupssettings.Groups, v string) { g.EnableCollaborativeInbox = v },
+	},
+	{
 		name: "archive_only",
 		description: "Makes the group read-only: new messages are rejected and `who_can_post_message` becomes " +
 			"`NONE_CAN_POST`. Turning it off resets `who_can_post_message` to `ALL_MANAGERS_CAN_POST`.",
@@ -232,10 +242,15 @@ func (r *groupSettingsResource) Configure(_ context.Context, req resource.Config
 	r.client = c
 }
 
-// ModifyPlan marks who_can_post_message unknown when archive_only changes and the
-// configuration leaves it unset, since Workspace changes it as a side effect.
+// ModifyPlan warns when collaborative inbox is planned without conversation
+// history, and marks who_can_post_message unknown when archive_only changes and
+// the configuration leaves it unset, since Workspace changes it as a side effect.
 func (r *groupSettingsResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+	resp.Diagnostics.Append(warnCollaborativeInboxWithoutHistory(ctx, req.Plan)...)
+	if req.State.Raw.IsNull() || resp.Diagnostics.HasError() {
 		return
 	}
 	var planned, prior types.Bool
@@ -249,6 +264,29 @@ func (r *groupSettingsResource) ModifyPlan(ctx context.Context, req resource.Mod
 	if configured.IsNull() && !planned.IsUnknown() && !planned.Equal(prior) {
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("who_can_post_message"), types.StringUnknown())...)
 	}
+}
+
+// warnCollaborativeInboxWithoutHistory warns when the plan turns on collaborative
+// inbox while is_archived (conversation history) is known to be false, whether
+// configured or kept from state. Google's help center says the features need
+// conversation history; whether the API rejects the combination is unverified.
+func warnCollaborativeInboxWithoutHistory(ctx context.Context, plan planReader) diag.Diagnostics {
+	var diags diag.Diagnostics
+	var inbox, archived types.Bool
+	diags.Append(plan.GetAttribute(ctx, path.Root("enable_collaborative_inbox"), &inbox)...)
+	diags.Append(plan.GetAttribute(ctx, path.Root("is_archived"), &archived)...)
+	if diags.HasError() {
+		return diags
+	}
+	if inbox.IsUnknown() || archived.IsUnknown() || !inbox.ValueBool() || archived.IsNull() || archived.ValueBool() {
+		return diags
+	}
+	diags.AddAttributeWarning(path.Root("enable_collaborative_inbox"),
+		"Collaborative inbox without conversation history",
+		"enable_collaborative_inbox is true but is_archived is false. Google requires conversation history "+
+			"(is_archived) for Collaborative Inbox features (https://support.google.com/a/users/answer/10375787); "+
+			"set is_archived = true.")
+	return diags
 }
 
 func (r *groupSettingsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

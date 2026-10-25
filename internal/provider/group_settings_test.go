@@ -4,7 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"google.golang.org/api/groupssettings/v1"
 )
 
@@ -68,5 +71,51 @@ func TestAPIBool(t *testing.T) {
 	}
 	if b := apiBool(""); !b.IsNull() {
 		t.Errorf(`apiBool("") = %v, want null`, b)
+	}
+}
+
+// boolPlan is a planReader holding Bool attributes; missing ones read as null.
+type boolPlan map[string]types.Bool
+
+func (p boolPlan) GetAttribute(_ context.Context, at path.Path, target any) diag.Diagnostics {
+	v, ok := p[at.String()]
+	if !ok {
+		v = types.BoolNull()
+	}
+	*(target.(*types.Bool)) = v
+	return nil
+}
+
+func TestWarnCollaborativeInboxWithoutHistory(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		inbox, archived types.Bool
+		warn            bool
+	}{
+		{"inbox with history", types.BoolValue(true), types.BoolValue(true), false},
+		{"inbox without history", types.BoolValue(true), types.BoolValue(false), true},
+		{"inbox, history unknown", types.BoolValue(true), types.BoolUnknown(), false},
+		{"inbox, history null", types.BoolValue(true), types.BoolNull(), false},
+		{"inbox unknown", types.BoolUnknown(), types.BoolValue(false), false},
+		{"inbox off", types.BoolValue(false), types.BoolValue(false), false},
+		{"inbox null", types.BoolNull(), types.BoolValue(false), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			diags := warnCollaborativeInboxWithoutHistory(context.Background(), boolPlan{
+				"enable_collaborative_inbox": tt.inbox,
+				"is_archived":                tt.archived,
+			})
+			if diags.HasError() {
+				t.Fatalf("unexpected error: %v", diags)
+			}
+			if got := diags.WarningsCount() > 0; got != tt.warn {
+				t.Errorf("warning = %v, want %v (%v)", got, tt.warn, diags)
+			}
+		})
 	}
 }
