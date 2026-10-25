@@ -89,7 +89,7 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 		return nil, err
 	}
 
-	dir, err := admin.NewService(ctx, option.WithTokenSource(ts))
+	dir, err := admin.NewService(ctx, option.WithHTTPClient(newHTTPClient(ts)))
 	if err != nil {
 		return nil, fmt.Errorf("creating Admin SDK Directory client: %w", err)
 	}
@@ -118,7 +118,7 @@ func (c *Client) GmailFor(mailbox string) (*gmail.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc, err := gmail.NewService(c.ctx, option.WithTokenSource(ts))
+	svc, err := gmail.NewService(c.ctx, option.WithHTTPClient(newHTTPClient(ts)))
 	if err != nil {
 		return nil, fmt.Errorf("creating Gmail client for %s: %w", mailbox, err)
 	}
@@ -139,7 +139,7 @@ func (c *Client) Policies() (*cloudidentity.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc, err := cloudidentity.NewService(c.ctx, option.WithTokenSource(ts))
+	svc, err := cloudidentity.NewService(c.ctx, option.WithHTTPClient(newHTTPClient(ts)))
 	if err != nil {
 		return nil, fmt.Errorf("creating Cloud Identity client: %w", err)
 	}
@@ -160,7 +160,7 @@ func (c *Client) GroupSettings() (*groupssettings.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	svc, err := groupssettings.NewService(c.ctx, option.WithTokenSource(ts))
+	svc, err := groupssettings.NewService(c.ctx, option.WithHTTPClient(newHTTPClient(ts)))
 	if err != nil {
 		return nil, fmt.Errorf("creating Groups Settings client: %w", err)
 	}
