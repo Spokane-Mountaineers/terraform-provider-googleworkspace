@@ -38,16 +38,18 @@ func NewGroupSettingsResource() resource.Resource {
 }
 
 // groupSetting maps one Terraform attribute to a Groups Settings API field. The API
-// carries booleans as "true"/"false" strings; values is nil for those.
+// carries booleans as "true"/"false" strings; values is nil for those. A text
+// setting takes free text, so it has no values either.
 type groupSetting struct {
 	name        string
 	description string
 	values      []string
+	text        bool
 	get         func(*groupssettings.Groups) string
 	set         func(*groupssettings.Groups, string)
 }
 
-func (s groupSetting) isBool() bool { return s.values == nil }
+func (s groupSetting) isBool() bool { return s.values == nil && !s.text }
 
 // groupSettings are the managed settings. Deprecated API fields are left out; their
 // replacements (who_can_moderate_*, who_can_discover_group) are here.
@@ -131,6 +133,26 @@ var groupSettings = []groupSetting{
 		set:         func(g *groupssettings.Groups, v string) { g.SpamModerationLevel = v },
 	},
 	{
+		name: "reply_to",
+		description: "Where replies to group messages go by default. `REPLY_TO_LIST` sends them to the group, " +
+			"`REPLY_TO_SENDER` to the message's author, `REPLY_TO_OWNER` to the group's owners (not managers), " +
+			"`REPLY_TO_MANAGERS` to its managers and owner, and `REPLY_TO_CUSTOM` to `custom_reply_to`. With " +
+			"`REPLY_TO_IGNORE`, each member decides.",
+		values: []string{"REPLY_TO_CUSTOM", "REPLY_TO_SENDER", "REPLY_TO_LIST", "REPLY_TO_OWNER", "REPLY_TO_IGNORE", "REPLY_TO_MANAGERS"},
+		get:    func(g *groupssettings.Groups) string { return g.ReplyTo },
+		set:    func(g *groupssettings.Groups, v string) { g.ReplyTo = v },
+	},
+	{
+		name: "custom_reply_to",
+		description: "The address replies go to when `reply_to` is `REPLY_TO_CUSTOM`, which requires it. The " +
+			"Groups Settings API reference does not say what happens when it is set with another `reply_to`, so " +
+			"the plan warns about that instead of failing. Once set, it cannot be cleared through this provider: " +
+			"the API client leaves empty values out of the request.",
+		text: true,
+		get:  func(g *groupssettings.Groups) string { return g.CustomReplyTo },
+		set:  func(g *groupssettings.Groups, v string) { g.CustomReplyTo = v },
+	},
+	{
 		name: "allow_external_members",
 		description: "Whether people outside the organization can be members. Workspace must also allow external " +
 			"members for the organization (Admin console > Apps > Google Groups for Business).",
@@ -207,6 +229,16 @@ func (r *groupSettingsResource) Schema(_ context.Context, _ resource.SchemaReque
 			}
 			continue
 		}
+		if s.text {
+			attrs[s.name] = schema.StringAttribute{
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:          []validator.String{stringvalidator.LengthAtLeast(1)},
+				MarkdownDescription: s.description,
+			}
+			continue
+		}
 		attrs[s.name] = schema.StringAttribute{
 			Optional:            true,
 			Computed:            true,
@@ -243,13 +275,14 @@ func (r *groupSettingsResource) Configure(_ context.Context, req resource.Config
 }
 
 // ModifyPlan warns when collaborative inbox is planned without conversation
-// history, and marks who_can_post_message unknown when archive_only changes and
+// history, checks custom_reply_to against reply_to, and marks who_can_post_message unknown when archive_only changes and
 // the configuration leaves it unset, since Workspace changes it as a side effect.
 func (r *groupSettingsResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
 		return
 	}
 	resp.Diagnostics.Append(warnCollaborativeInboxWithoutHistory(ctx, req.Plan)...)
+	resp.Diagnostics.Append(checkCustomReplyTo(ctx, req.Config, req.Plan)...)
 	if req.State.Raw.IsNull() || resp.Diagnostics.HasError() {
 		return
 	}
@@ -286,6 +319,41 @@ func warnCollaborativeInboxWithoutHistory(ctx context.Context, plan planReader) 
 		"enable_collaborative_inbox is true but is_archived is false. Google requires conversation history "+
 			"(is_archived) for Collaborative Inbox features (https://support.google.com/a/users/answer/10375787); "+
 			"set is_archived = true.")
+	return diags
+}
+
+// checkCustomReplyTo fails the plan when reply_to is REPLY_TO_CUSTOM without an
+// address, which the API rejects, and warns when that can't be known yet. It also
+// warns when custom_reply_to is configured with another reply_to: the API
+// reference doesn't say whether that is rejected or ignored. The configured value
+// is read, so an address kept in state doesn't warn on every plan.
+func checkCustomReplyTo(ctx context.Context, config, plan planReader) diag.Diagnostics {
+	var diags diag.Diagnostics
+	var replyTo, planned, configured types.String
+	diags.Append(plan.GetAttribute(ctx, path.Root("reply_to"), &replyTo)...)
+	diags.Append(plan.GetAttribute(ctx, path.Root("custom_reply_to"), &planned)...)
+	diags.Append(config.GetAttribute(ctx, path.Root("custom_reply_to"), &configured)...)
+	if diags.HasError() || replyTo.IsUnknown() || replyTo.IsNull() {
+		return diags
+	}
+	attr := path.Root("custom_reply_to")
+	if replyTo.ValueString() == "REPLY_TO_CUSTOM" {
+		switch {
+		case planned.IsUnknown():
+			diags.AddAttributeWarning(attr, "reply_to is REPLY_TO_CUSTOM without custom_reply_to",
+				"custom_reply_to is not set. Workspace rejects REPLY_TO_CUSTOM unless the group already has a "+
+					"custom reply-to address; set custom_reply_to.")
+		case planned.IsNull() || planned.ValueString() == "":
+			diags.AddAttributeError(attr, "reply_to is REPLY_TO_CUSTOM without custom_reply_to",
+				"Workspace rejects REPLY_TO_CUSTOM without a custom reply-to address; set custom_reply_to.")
+		}
+		return diags
+	}
+	if !configured.IsNull() && !configured.IsUnknown() {
+		diags.AddAttributeWarning(attr, "custom_reply_to is not used",
+			fmt.Sprintf("custom_reply_to only applies when reply_to is REPLY_TO_CUSTOM, but reply_to is %s. "+
+				"Workspace may ignore or reject it.", replyTo.ValueString()))
+	}
 	return diags
 }
 
