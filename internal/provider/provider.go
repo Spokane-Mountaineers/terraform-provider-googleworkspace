@@ -97,6 +97,7 @@ func (p *googleWorkspaceProvider) Resources(_ context.Context) []func() resource
 		NewGroupResource,
 		NewGroupMemberResource,
 		NewGroupSettingsResource,
+		NewGroupAliasResource,
 		NewUserResource,
 		NewGmailDelegateResource,
 	}

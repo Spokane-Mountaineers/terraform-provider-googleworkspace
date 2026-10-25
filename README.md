@@ -13,8 +13,8 @@ org actually manages. Resources are named `googleworkspace_*` (for example
 `registry.opentofu.org/spokane-mountaineers/googleworkspace`.
 
 > **Status:** early. It ships `googleworkspace_user`, `googleworkspace_org_unit`,
-> `googleworkspace_group`, `googleworkspace_group_member`, `googleworkspace_group_settings`
-> and `googleworkspace_gmail_delegate` resources, plus `domains`, `users`, `org_unit`,
+> `googleworkspace_group`, `googleworkspace_group_member`, `googleworkspace_group_settings`,
+> `googleworkspace_group_alias` and `googleworkspace_gmail_delegate` resources, plus `domains`, `users`, `org_unit`,
 > `org_units`, `group`, `policies` and `role_assignments` data sources.
 
 ## Authentication
