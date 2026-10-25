@@ -45,7 +45,10 @@ func TestGroupSettings_FieldMapping(t *testing.T) {
 
 		g := &groupssettings.Groups{}
 		value := "true"
-		if !s.isBool() {
+		switch {
+		case s.text:
+			value = "replies@example.org"
+		case !s.isBool():
 			value = s.values[0]
 		}
 		s.set(g, value)
@@ -112,6 +115,55 @@ func TestWarnCollaborativeInboxWithoutHistory(t *testing.T) {
 			})
 			if diags.HasError() {
 				t.Fatalf("unexpected error: %v", diags)
+			}
+			if got := diags.WarningsCount() > 0; got != tt.warn {
+				t.Errorf("warning = %v, want %v (%v)", got, tt.warn, diags)
+			}
+		})
+	}
+}
+
+// stringPlan is a planReader holding String attributes; missing ones read as null.
+type stringPlan map[string]types.String
+
+func (p stringPlan) GetAttribute(_ context.Context, at path.Path, target any) diag.Diagnostics {
+	v, ok := p[at.String()]
+	if !ok {
+		v = types.StringNull()
+	}
+	*(target.(*types.String)) = v
+	return nil
+}
+
+func TestCheckCustomReplyTo(t *testing.T) {
+	t.Parallel()
+
+	addr := types.StringValue("replies@example.org")
+	tests := []struct {
+		name                         string
+		replyTo, planned, configured types.String
+		err, warn                    bool
+	}{
+		{"custom with address", types.StringValue("REPLY_TO_CUSTOM"), addr, addr, false, false},
+		{"custom without address", types.StringValue("REPLY_TO_CUSTOM"), types.StringNull(), types.StringNull(), true, false},
+		{"custom with empty address", types.StringValue("REPLY_TO_CUSTOM"), types.StringValue(""), types.StringNull(), true, false},
+		{"custom, address unknown", types.StringValue("REPLY_TO_CUSTOM"), types.StringUnknown(), types.StringNull(), false, true},
+		{"list with configured address", types.StringValue("REPLY_TO_LIST"), addr, addr, false, true},
+		{"list with address kept in state", types.StringValue("REPLY_TO_LIST"), addr, types.StringNull(), false, false},
+		{"list without address", types.StringValue("REPLY_TO_LIST"), types.StringNull(), types.StringNull(), false, false},
+		{"reply_to unknown", types.StringUnknown(), types.StringNull(), addr, false, false},
+		{"reply_to null", types.StringNull(), types.StringNull(), addr, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			diags := checkCustomReplyTo(context.Background(),
+				stringPlan{"custom_reply_to": tt.configured},
+				stringPlan{"reply_to": tt.replyTo, "custom_reply_to": tt.planned},
+			)
+			if got := diags.HasError(); got != tt.err {
+				t.Errorf("error = %v, want %v (%v)", got, tt.err, diags)
 			}
 			if got := diags.WarningsCount() > 0; got != tt.warn {
 				t.Errorf("warning = %v, want %v (%v)", got, tt.warn, diags)
