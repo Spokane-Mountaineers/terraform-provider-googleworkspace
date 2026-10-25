@@ -27,3 +27,14 @@ resource "googleworkspace_group_settings" "hiking" {
   message_moderation_level = "MODERATE_NON_MEMBERS"
   allow_external_members   = true
 }
+
+# A shared support inbox: members take, assign, and resolve conversations.
+# Collaborative inbox needs conversation history, so is_archived is set too.
+resource "googleworkspace_group_settings" "help" {
+  email = "help@example.org"
+
+  enable_collaborative_inbox = true
+  is_archived                = true
+  who_can_post_message       = "ANYONE_CAN_POST"
+  who_can_view_group         = "ALL_MEMBERS_CAN_VIEW"
+}
