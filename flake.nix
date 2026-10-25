@@ -9,7 +9,7 @@
   outputs = { self, nixpkgs }:
     let
       # Keep in step with the release tag; consumers pin this exact version.
-      version = "0.1.6";
+      version = "0.1.7";
 
       systems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
