@@ -5,7 +5,7 @@ subcategory: ""
 description: |-
   Gives one user access to another user's Gmail mailbox (mail delegation). The delegate can read, send, and delete mail in the mailbox from their own account, without its password.
   This suits role mailboxes such as treasurer@: the mailbox keeps its history and filters while the people holding the role change. The delegate can be a group, so handing a role over becomes a membership change: add the new holder to the group, then remove the old one.
-  Delegates are added as accepted immediately, with no invitation email, though Google notes they can take up to a minute to become usable. Both users must be in this Workspace account, and Google generally allows up to 25 delegates per mailbox.
+  Delegates are added as accepted immediately, with no invitation email, though Google notes they can take up to a minute to become usable. If the mailbox owner was just created, creating the delegate waits up to 5 minutes for the owner's mailbox to be set up first. Both users must be in this Workspace account, and Google generally allows up to 25 delegates per mailbox.
   ~> Requirements: the provider must use service_account (the call impersonates the mailbox owner, so a pre-minted access_token cannot be used), the service account's domain-wide delegation must include the https://www.googleapis.com/auth/gmail.settings.basic (read) and https://www.googleapis.com/auth/gmail.settings.sharing (create/delete) scopes, the Gmail API must be enabled in its project, and Mail delegation must be enabled in the Admin console for the mailbox's organizational unit.
 ---
 
@@ -15,7 +15,7 @@ Gives one user access to another user's Gmail mailbox (mail delegation). The del
 
 This suits role mailboxes such as `treasurer@`: the mailbox keeps its history and filters while the people holding the role change. The delegate can be a group, so handing a role over becomes a membership change: add the new holder to the group, then remove the old one.
 
-Delegates are added as `accepted` immediately, with no invitation email, though Google notes they can take up to a minute to become usable. Both users must be in this Workspace account, and Google generally allows up to 25 delegates per mailbox.
+Delegates are added as `accepted` immediately, with no invitation email, though Google notes they can take up to a minute to become usable. If the mailbox owner was just created, creating the delegate waits up to 5 minutes for the owner's mailbox to be set up first. Both users must be in this Workspace account, and Google generally allows up to 25 delegates per mailbox.
 
 ~> **Requirements:** the provider must use `service_account` (the call impersonates the mailbox owner, so a pre-minted `access_token` cannot be used), the service account's domain-wide delegation must include the `https://www.googleapis.com/auth/gmail.settings.basic` (read) and `https://www.googleapis.com/auth/gmail.settings.sharing` (create/delete) scopes, the Gmail API must be enabled in its project, and **Mail delegation** must be enabled in the Admin console for the mailbox's organizational unit.
 
