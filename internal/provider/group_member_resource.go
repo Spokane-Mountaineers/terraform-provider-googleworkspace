@@ -123,6 +123,19 @@ func (r *groupMemberResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
+	// The insert response can leave out the member ID, or carry one that doesn't
+	// match the membership (seen for an external address and for a just-renamed
+	// user), so read the membership back by email before saving it.
+	err = withRetry(ctx, func() error {
+		var e error
+		m, e = r.client.Directory.Members.Get(groupID, plan.Email.ValueString()).Context(ctx).Do()
+		return e
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to read added group member", err.Error())
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, memberToModel(groupID, m))...)
 }
 
@@ -133,13 +146,13 @@ func (r *groupMemberResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
-	groupID, memberID, ok := splitMemberID(state.ID.ValueString())
+	groupID, key, ok := memberKey(state.ID.ValueString(), state.Email.ValueString())
 	if !ok {
 		resp.Diagnostics.AddError("Invalid group member ID", fmt.Sprintf("expected `<group_id>/<member_id>`, got %q", state.ID.ValueString()))
 		return
 	}
 
-	m, err := r.client.Directory.Members.Get(groupID, memberID).Context(ctx).Do()
+	m, err := r.client.Directory.Members.Get(groupID, key).Context(ctx).Do()
 	if err != nil {
 		if isNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -161,7 +174,8 @@ func (r *groupMemberResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	groupID := state.GroupID.ValueString()
-	m, err := r.client.Directory.Members.Update(groupID, state.MemberID.ValueString(), &admin.Member{
+	_, key, _ := memberKey(state.ID.ValueString(), state.Email.ValueString())
+	m, err := r.client.Directory.Members.Update(groupID, key, &admin.Member{
 		Role:             plan.Role.ValueString(),
 		DeliverySettings: plan.DeliverySettings.ValueString(),
 	}).Context(ctx).Do()
@@ -180,7 +194,8 @@ func (r *groupMemberResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	if err := r.client.Directory.Members.Delete(state.GroupID.ValueString(), state.MemberID.ValueString()).Context(ctx).Do(); err != nil {
+	_, key, _ := memberKey(state.ID.ValueString(), state.Email.ValueString())
+	if err := r.client.Directory.Members.Delete(state.GroupID.ValueString(), key).Context(ctx).Do(); err != nil {
 		if isNotFound(err) {
 			return
 		}
@@ -204,10 +219,16 @@ func memberToModel(groupID string, m *admin.Member) groupMemberModel {
 	}
 }
 
-func splitMemberID(id string) (groupID, memberID string, ok bool) {
-	groupID, memberID, found := strings.Cut(id, "/")
-	if !found || groupID == "" || memberID == "" {
+// memberKey splits a `<group_id>/<member_id>` ID into the group ID and the key
+// to address the membership by: the member ID, or the member's email when the ID
+// is empty, as in state saved from an insert response that had none.
+func memberKey(id, email string) (groupID, key string, ok bool) {
+	groupID, key, found := strings.Cut(id, "/")
+	if key == "" {
+		key = email
+	}
+	if !found || groupID == "" || key == "" {
 		return "", "", false
 	}
-	return groupID, memberID, true
+	return groupID, key, true
 }
