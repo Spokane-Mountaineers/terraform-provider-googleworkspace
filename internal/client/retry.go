@@ -42,7 +42,10 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		if err != nil || !isRetryable(resp.StatusCode) || attempt >= t.attempts {
 			return resp, err
 		}
-		wait := t.backoff(attempt, resp.Header.Get("Retry-After"))
+		wait, ok := t.backoff(attempt, resp.Header.Get("Retry-After"))
+		if !ok {
+			return resp, nil
+		}
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 
@@ -67,9 +70,11 @@ func isRetryable(status int) bool {
 }
 
 // backoff returns how long to wait after the given failed attempt: delay doubled
-// per attempt with up to half of it as random jitter, at least what Retry-After
-// asks for in seconds, and never more than maxDelay.
-func (t *retryTransport) backoff(attempt int, retryAfter string) time.Duration {
+// per attempt with up to half of it as random jitter, capped at maxDelay, and at
+// least what Retry-After asks for in seconds. When Retry-After asks for longer than
+// maxDelay it returns false: retrying sooner than the server allows only adds load,
+// so the caller fails instead.
+func (t *retryTransport) backoff(attempt int, retryAfter string) (time.Duration, bool) {
 	d := t.delay << (attempt - 1)
 	if d <= 0 || d > t.maxDelay {
 		d = t.maxDelay
@@ -78,9 +83,11 @@ func (t *retryTransport) backoff(attempt int, retryAfter string) time.Duration {
 		d = time.Duration(half + rand.Int64N(half+1))
 	}
 	if secs, err := strconv.Atoi(retryAfter); err == nil && secs > 0 {
-		if ra := time.Duration(secs) * time.Second; ra > d {
-			d = ra
+		ra := time.Duration(secs) * time.Second
+		if ra > t.maxDelay {
+			return 0, false
 		}
+		d = max(d, ra)
 	}
-	return min(d, t.maxDelay)
+	return d, true
 }
