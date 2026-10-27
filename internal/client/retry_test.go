@@ -42,6 +42,8 @@ func TestRetryTransport(t *testing.T) {
 		{"read recovers", http.MethodGet, 2, http.StatusServiceUnavailable, http.StatusOK, 3},
 		{"read gives up", http.MethodGet, 5, http.StatusServiceUnavailable, http.StatusServiceUnavailable, 3},
 		{"bad gateway retried", http.MethodGet, 1, http.StatusBadGateway, http.StatusOK, 2},
+		{"rate limit retried", http.MethodGet, 2, http.StatusTooManyRequests, http.StatusOK, 3},
+		{"rate limited write not retried", http.MethodPost, 1, http.StatusTooManyRequests, http.StatusTooManyRequests, 1},
 		{"not implemented not retried", http.MethodGet, 1, http.StatusNotImplemented, http.StatusNotImplemented, 1},
 		{"not found not retried", http.MethodGet, 1, http.StatusNotFound, http.StatusNotFound, 1},
 		{"write not retried", http.MethodPost, 1, http.StatusServiceUnavailable, http.StatusServiceUnavailable, 1},

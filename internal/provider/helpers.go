@@ -25,7 +25,7 @@ func isTransient(err error) bool {
 // withRetry runs fn, retrying on transient errors with linear backoff. It is used
 // for operations that can race a recently-created dependency (e.g. adding a member
 // to a brand-new group), not for steady-state reads where a 404 is meaningful.
-// Reads that hit a server error are retried by the client's HTTP transport.
+// Reads that hit a server error or a 429 are retried by the client's HTTP transport.
 func withRetry(ctx context.Context, fn func() error) error {
 	var err error
 	for attempt := 0; attempt < 4; attempt++ {
