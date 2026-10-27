@@ -42,6 +42,8 @@ func TestRetryTransport(t *testing.T) {
 		{"read recovers", http.MethodGet, 2, http.StatusServiceUnavailable, http.StatusOK, 3},
 		{"read gives up", http.MethodGet, 5, http.StatusServiceUnavailable, http.StatusServiceUnavailable, 3},
 		{"bad gateway retried", http.MethodGet, 1, http.StatusBadGateway, http.StatusOK, 2},
+		{"rate limit retried", http.MethodGet, 2, http.StatusTooManyRequests, http.StatusOK, 3},
+		{"rate limited write not retried", http.MethodPost, 1, http.StatusTooManyRequests, http.StatusTooManyRequests, 1},
 		{"not implemented not retried", http.MethodGet, 1, http.StatusNotImplemented, http.StatusNotImplemented, 1},
 		{"not found not retried", http.MethodGet, 1, http.StatusNotFound, http.StatusNotFound, 1},
 		{"write not retried", http.MethodPost, 1, http.StatusServiceUnavailable, http.StatusServiceUnavailable, 1},
@@ -98,17 +100,45 @@ func TestRetryTransport_Backoff(t *testing.T) {
 
 	tr := &retryTransport{delay: time.Second, maxDelay: 16 * time.Second}
 	for attempt, base := range map[int]time.Duration{1: time.Second, 2: 2 * time.Second, 4: 8 * time.Second, 10: 16 * time.Second} {
-		if d := tr.backoff(attempt, ""); d < base/2 || d > base {
+		if d, ok := tr.backoff(attempt, ""); !ok || d < base/2 || d > base {
 			t.Errorf("backoff(%d) = %v, want between %v and %v", attempt, d, base/2, base)
 		}
 	}
-	if d := tr.backoff(1, "5"); d != 5*time.Second {
-		t.Errorf("backoff with Retry-After 5 = %v, want 5s", d)
+	if d, ok := tr.backoff(1, "5"); !ok || d != 5*time.Second {
+		t.Errorf("backoff with Retry-After 5 = %v, %v; want 5s, true", d, ok)
 	}
-	if d := tr.backoff(1, "60"); d != 16*time.Second {
-		t.Errorf("backoff with Retry-After 60 = %v, want the 16s cap", d)
+	if d, ok := tr.backoff(1, "60"); ok {
+		t.Errorf("backoff with Retry-After 60 = %v, true; want to give up", d)
 	}
-	if d := tr.backoff(1, "Wed, 21 Oct 2026 07:28:00 GMT"); d > time.Second {
+	if d, ok := tr.backoff(1, "Wed, 21 Oct 2026 07:28:00 GMT"); !ok || d > time.Second {
 		t.Errorf("backoff with an HTTP-date Retry-After = %v, want the normal backoff", d)
+	}
+}
+
+func TestRetryTransport_RetryAfterBeyondCap(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.Header().Set("Retry-After", "60")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	t.Cleanup(srv.Close)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := testTransport().RoundTrip(req)
+	if err != nil {
+		t.Fatalf("RoundTrip: %v", err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusTooManyRequests {
+		t.Errorf("status = %d, want 429", resp.StatusCode)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Errorf("calls = %d, want 1: a Retry-After beyond the cap must not be retried early", got)
 	}
 }

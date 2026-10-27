@@ -10,8 +10,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// retryTransport retries reads (GET and HEAD) that fail with a server error, so a
-// brief Google outage doesn't fail a whole plan. It waits with exponential backoff
+// retryTransport retries reads (GET and HEAD) that fail with a server error or are
+// rate limited, so a brief Google outage or a 429 doesn't fail a whole plan. It waits with exponential backoff
 // and jitter, or longer if the response asks for it with Retry-After. Writes are
 // not retried here; resources retry those themselves where it is safe.
 type retryTransport struct {
@@ -22,12 +22,12 @@ type retryTransport struct {
 }
 
 // newHTTPClient returns an HTTP client that authorizes requests with ts and
-// retries reads that fail with a server error: up to 5 tries, waiting about 1s,
-// 2s, 4s, then 8s.
+// retries reads that fail with a server error or a 429: up to 7 tries, waiting
+// about 1s, 2s, 4s, 8s, 16s, then 16s, so a retry can outlast a per-minute quota.
 func newHTTPClient(ts oauth2.TokenSource) *http.Client {
 	return &http.Client{Transport: &retryTransport{
 		base:     &oauth2.Transport{Source: ts, Base: http.DefaultTransport},
-		attempts: 5,
+		attempts: 7,
 		delay:    time.Second,
 		maxDelay: 16 * time.Second,
 	}}
@@ -39,10 +39,13 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	for attempt := 1; ; attempt++ {
 		resp, err := t.base.RoundTrip(req)
-		if err != nil || !isServerError(resp.StatusCode) || attempt >= t.attempts {
+		if err != nil || !isRetryable(resp.StatusCode) || attempt >= t.attempts {
 			return resp, err
 		}
-		wait := t.backoff(attempt, resp.Header.Get("Retry-After"))
+		wait, ok := t.backoff(attempt, resp.Header.Get("Retry-After"))
+		if !ok {
+			return resp, nil
+		}
 		_, _ = io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 
@@ -56,20 +59,22 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 }
 
-// isServerError reports whether status is a server error worth retrying. 501 Not
-// Implemented won't change on a retry, so it is left out.
-func isServerError(status int) bool {
+// isRetryable reports whether status is worth retrying: a rate limit or a server
+// error. 501 Not Implemented won't change on a retry, so it is left out.
+func isRetryable(status int) bool {
 	switch status {
-	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+	case http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
 		return true
 	}
 	return false
 }
 
 // backoff returns how long to wait after the given failed attempt: delay doubled
-// per attempt with up to half of it as random jitter, at least what Retry-After
-// asks for in seconds, and never more than maxDelay.
-func (t *retryTransport) backoff(attempt int, retryAfter string) time.Duration {
+// per attempt with up to half of it as random jitter, capped at maxDelay, and at
+// least what Retry-After asks for in seconds. When Retry-After asks for longer than
+// maxDelay it returns false: retrying sooner than the server allows only adds load,
+// so the caller fails instead.
+func (t *retryTransport) backoff(attempt int, retryAfter string) (time.Duration, bool) {
 	d := t.delay << (attempt - 1)
 	if d <= 0 || d > t.maxDelay {
 		d = t.maxDelay
@@ -78,9 +83,11 @@ func (t *retryTransport) backoff(attempt int, retryAfter string) time.Duration {
 		d = time.Duration(half + rand.Int64N(half+1))
 	}
 	if secs, err := strconv.Atoi(retryAfter); err == nil && secs > 0 {
-		if ra := time.Duration(secs) * time.Second; ra > d {
-			d = ra
+		ra := time.Duration(secs) * time.Second
+		if ra > t.maxDelay {
+			return 0, false
 		}
+		d = max(d, ra)
 	}
-	return min(d, t.maxDelay)
+	return d, true
 }
