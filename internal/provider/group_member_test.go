@@ -23,22 +23,25 @@ func TestGroupMemberResource_Schema(t *testing.T) {
 	}
 }
 
-func TestSplitMemberID(t *testing.T) {
+func TestMemberKey(t *testing.T) {
 	t.Parallel()
 
-	cases := map[string]struct {
-		g, m string
-		ok   bool
+	tests := []struct {
+		id, email string
+		group     string
+		key       string
+		ok        bool
 	}{
-		"01grp/02mbr": {"01grp", "02mbr", true},
-		"noslash":     {"", "", false},
-		"/only":       {"", "", false},
-		"only/":       {"", "", false},
+		{"01grp/02mbr", "a@example.org", "01grp", "02mbr", true},
+		{"01grp/", "a@example.org", "01grp", "a@example.org", true},
+		{"01grp/", "", "", "", false},
+		{"noslash", "a@example.org", "", "", false},
+		{"/02mbr", "a@example.org", "", "", false},
 	}
-	for in, want := range cases {
-		g, m, ok := splitMemberID(in)
-		if g != want.g || m != want.m || ok != want.ok {
-			t.Errorf("splitMemberID(%q) = (%q,%q,%v), want (%q,%q,%v)", in, g, m, ok, want.g, want.m, want.ok)
+	for _, tt := range tests {
+		g, k, ok := memberKey(tt.id, tt.email)
+		if g != tt.group || k != tt.key || ok != tt.ok {
+			t.Errorf("memberKey(%q, %q) = (%q, %q, %v), want (%q, %q, %v)", tt.id, tt.email, g, k, ok, tt.group, tt.key, tt.ok)
 		}
 	}
 }
