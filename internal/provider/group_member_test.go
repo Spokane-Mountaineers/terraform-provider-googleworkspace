@@ -2,9 +2,14 @@ package provider
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	admin "google.golang.org/api/admin/directory/v1"
+	"google.golang.org/api/option"
 )
 
 func TestGroupMemberResource_Schema(t *testing.T) {
@@ -43,5 +48,44 @@ func TestMemberKey(t *testing.T) {
 		if g != tt.group || k != tt.key || ok != tt.ok {
 			t.Errorf("memberKey(%q, %q) = (%q, %q, %v), want (%q, %q, %v)", tt.id, tt.email, g, k, ok, tt.group, tt.key, tt.ok)
 		}
+	}
+}
+
+func TestFindMember(t *testing.T) {
+	t.Parallel()
+
+	// One member resolves by email; the other only shows up in the member list.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/admin/directory/v1/groups/01grp/members/direct@example.org":
+			_, _ = io.WriteString(w, `{"id":"1","email":"direct@example.org"}`)
+		case "/admin/directory/v1/groups/01grp/members":
+			if r.URL.Query().Get("pageToken") == "" {
+				_, _ = io.WriteString(w, `{"members":[{"id":"1","email":"direct@example.org"}],"nextPageToken":"p2"}`)
+				return
+			}
+			_, _ = io.WriteString(w, `{"members":[{"id":"2","email":"Listed@Example.org"}]}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = io.WriteString(w, `{"error":{"code":404,"message":"Resource Not Found: email"}}`)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	ctx := context.Background()
+	svc, err := admin.NewService(ctx, option.WithEndpoint(srv.URL+"/"), option.WithHTTPClient(srv.Client()))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for email, want := range map[string]string{"direct@example.org": "1", "listed@example.org": "2"} {
+		m, err := findMember(ctx, svc, "01grp", email)
+		if err != nil || m.Id != want {
+			t.Errorf("findMember(%q) = %+v, %v; want id %q", email, m, err, want)
+		}
+	}
+	if _, err := findMember(ctx, svc, "01grp", "absent@example.org"); !isNotFound(err) {
+		t.Errorf("findMember(absent) error = %v, want a 404", err)
 	}
 }

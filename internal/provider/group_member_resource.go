@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -125,10 +126,10 @@ func (r *groupMemberResource) Create(ctx context.Context, req resource.CreateReq
 
 	// The insert response can leave out the member ID, or carry one that doesn't
 	// match the membership (seen for an external address and for a just-renamed
-	// user), so read the membership back by email before saving it.
+	// user), so find the membership by email before saving it.
 	err = withRetry(ctx, func() error {
 		var e error
-		m, e = r.client.Directory.Members.Get(groupID, plan.Email.ValueString()).Context(ctx).Do()
+		m, e = findMember(ctx, r.client.Directory, groupID, plan.Email.ValueString())
 		return e
 	})
 	if err != nil {
@@ -231,4 +232,33 @@ func memberKey(id, email string) (groupID, key string, ok bool) {
 		return "", "", false
 	}
 	return groupID, key, true
+}
+
+// findMember looks up a group's member by email. Some addresses never resolve
+// that way (an external address with its own Google account kept returning 404
+// for days), so on a 404 it searches the group's member list instead. It returns
+// the 404 if the member isn't in the list either.
+func findMember(ctx context.Context, svc *admin.Service, groupID, email string) (*admin.Member, error) {
+	m, err := svc.Members.Get(groupID, email).Context(ctx).Do()
+	if err == nil || !isNotFound(err) {
+		return m, err
+	}
+	var found *admin.Member
+	errFound := errors.New("found")
+	listErr := svc.Members.List(groupID).Context(ctx).Pages(ctx, func(page *admin.Members) error {
+		for _, mm := range page.Members {
+			if strings.EqualFold(mm.Email, email) {
+				found = mm
+				return errFound
+			}
+		}
+		return nil
+	})
+	switch {
+	case found != nil:
+		return found, nil
+	case listErr != nil && !errors.Is(listErr, errFound):
+		return nil, listErr
+	}
+	return nil, err
 }
