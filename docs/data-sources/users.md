@@ -42,6 +42,7 @@ data "googleworkspace_users" "board" {
 
 Read-Only:
 
+- `aliases` (List of String) The user's editable alias email addresses, the ones `googleworkspace_user_alias` manages. Addresses Google adds on its own are left out.
 - `archived` (Boolean) Whether the account is archived.
 - `creation_time` (String) When the account was created (RFC 3339).
 - `family_name` (String) Last name.

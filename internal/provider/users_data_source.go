@@ -32,19 +32,20 @@ type usersDataModel struct {
 }
 
 type usersDataUserModel struct {
-	ID                         types.String `tfsdk:"id"`
-	PrimaryEmail               types.String `tfsdk:"primary_email"`
-	GivenName                  types.String `tfsdk:"given_name"`
-	FamilyName                 types.String `tfsdk:"family_name"`
-	OrgUnitPath                types.String `tfsdk:"org_unit_path"`
-	Suspended                  types.Bool   `tfsdk:"suspended"`
-	Archived                   types.Bool   `tfsdk:"archived"`
-	IsAdmin                    types.Bool   `tfsdk:"is_admin"`
-	RecoveryEmail              types.String `tfsdk:"recovery_email"`
-	RecoveryPhone              types.String `tfsdk:"recovery_phone"`
-	IncludeInGlobalAddressList types.Bool   `tfsdk:"include_in_global_address_list"`
-	CreationTime               types.String `tfsdk:"creation_time"`
-	LastLoginTime              types.String `tfsdk:"last_login_time"`
+	ID                         types.String   `tfsdk:"id"`
+	PrimaryEmail               types.String   `tfsdk:"primary_email"`
+	GivenName                  types.String   `tfsdk:"given_name"`
+	FamilyName                 types.String   `tfsdk:"family_name"`
+	OrgUnitPath                types.String   `tfsdk:"org_unit_path"`
+	Suspended                  types.Bool     `tfsdk:"suspended"`
+	Archived                   types.Bool     `tfsdk:"archived"`
+	IsAdmin                    types.Bool     `tfsdk:"is_admin"`
+	RecoveryEmail              types.String   `tfsdk:"recovery_email"`
+	RecoveryPhone              types.String   `tfsdk:"recovery_phone"`
+	IncludeInGlobalAddressList types.Bool     `tfsdk:"include_in_global_address_list"`
+	CreationTime               types.String   `tfsdk:"creation_time"`
+	LastLoginTime              types.String   `tfsdk:"last_login_time"`
+	Aliases                    []types.String `tfsdk:"aliases"`
 }
 
 func (d *usersDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -86,6 +87,12 @@ func (d *usersDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 						"include_in_global_address_list": boolean("Whether the user appears in the global address list."),
 						"creation_time":                  str("When the account was created (RFC 3339)."),
 						"last_login_time":                str("Last sign-in time (RFC 3339). `1970-01-01T00:00:00.000Z` means never."),
+						"aliases": schema.ListAttribute{
+							Computed:    true,
+							ElementType: types.StringType,
+							MarkdownDescription: "The user's editable alias email addresses, the ones " +
+								"`googleworkspace_user_alias` manages. Addresses Google adds on its own are left out.",
+						},
 					},
 				},
 			},
@@ -150,6 +157,10 @@ func userToDataModel(u *admin.User) usersDataUserModel {
 		IncludeInGlobalAddressList: types.BoolValue(u.IncludeInGlobalAddressList),
 		CreationTime:               types.StringValue(u.CreationTime),
 		LastLoginTime:              types.StringValue(u.LastLoginTime),
+		Aliases:                    []types.String{},
+	}
+	for _, a := range u.Aliases {
+		m.Aliases = append(m.Aliases, types.StringValue(a))
 	}
 	if u.Name != nil {
 		m.GivenName = types.StringValue(u.Name.GivenName)
